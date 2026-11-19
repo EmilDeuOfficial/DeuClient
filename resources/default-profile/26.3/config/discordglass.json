@@ -1,0 +1,47 @@
+{
+  "useOwnApp": false,
+  "tokenClientId": "",
+  "clientId": "",
+  "clientSecret": "",
+  "redirectUri": "http://localhost",
+  "accessToken": "",
+  "refreshToken": "",
+  "autoConnect": true,
+  "richPresence": true,
+  "hudEnabled": true,
+  "hudCorner": 0,
+  "hudOnlySpeaking": false,
+  "notifications": true,
+  "hudOpacity": 70,
+  "menuKey": {
+    "key": 29,
+    "ctrl": true,
+    "shift": false,
+    "alt": false
+  },
+  "muteKey": {
+    "key": 16,
+    "ctrl": true,
+    "shift": false,
+    "alt": false
+  },
+  "deafenKey": {
+    "key": 7,
+    "ctrl": true,
+    "shift": false,
+    "alt": false
+  },
+  "hudKey": {
+    "key": 11,
+    "ctrl": true,
+    "shift": false,
+    "alt": false
+  },
+  "leaveKey": {
+    "key": -1,
+    "ctrl": false,
+    "shift": false,
+    "alt": false
+  },
+  "layoutVersion": 1
+}

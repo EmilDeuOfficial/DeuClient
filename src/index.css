@@ -1,0 +1,196 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===================== DeuClient-Grundstil ===================== */
+
+:root {
+  color-scheme: dark;
+}
+
+html {
+  height: 100%;
+  background: #0a0d0b;
+}
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: #e8f5ec;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Bereiche der eigenen Titelleiste, mit denen das Fenster verschoben werden kann */
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* Scrollbars: schlicht, flach */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.26);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+/* Anfasser zum Vergroessern von Textfeldern: kein weisses Windows-Viereck */
+::-webkit-resizer {
+  background: transparent linear-gradient(135deg, transparent 0 50%, rgba(255, 255, 255, 0.35) 50% 58%, transparent 58% 72%, rgba(255, 255, 255, 0.35) 72% 80%, transparent 80%);
+  border-radius: 0 0 8px 0;
+}
+
+@layer components {
+  /* Flache Karte: Flaeche und feine Linie, keine Schatten oder Glas-Effekte */
+  .card {
+    @apply rounded-2xl border border-white/[0.07] bg-ink-850;
+  }
+  .card-hover {
+    @apply transition-colors duration-150 hover:border-white/20;
+  }
+
+  .text-accent-gradient {
+    @apply text-white;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors duration-150
+      disabled:pointer-events-none disabled:opacity-40;
+  }
+  .btn-accent {
+    @apply btn bg-accent-500 text-ink-950 hover:bg-accent-400;
+  }
+  .btn-alt {
+    @apply btn bg-ink-600 text-white hover:bg-ink-500;
+  }
+  .btn-ghost {
+    @apply btn border border-white/10 bg-white/[0.04] text-ink-100 hover:border-white/20 hover:bg-white/[0.08];
+  }
+  .btn-danger {
+    @apply btn border border-red-400/30 bg-red-500/10 text-red-200 hover:bg-red-500/20;
+  }
+  .btn-icon {
+    @apply inline-flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-ink-100
+      transition-colors hover:border-white/20 hover:bg-white/[0.08] disabled:opacity-40;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-white/10 bg-ink-950/60 px-3.5 py-2.5 text-sm text-ink-100 outline-none
+      transition-colors placeholder:text-ink-200/40 focus:border-accent-400/60;
+  }
+
+  .chip {
+    @apply inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs
+      font-medium text-ink-100 transition-colors hover:border-white/25;
+  }
+  .chip-active {
+    @apply border-accent-400/70 bg-accent-400/15 text-accent-200;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-ink-200/70;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider;
+  }
+}
+
+/* Slider (RAM etc.) */
+input[type='range'].deu-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e var(--fill, 50%), rgba(255, 255, 255, 0.1) var(--fill, 50%));
+  outline: none;
+}
+input[type='range'].deu-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #f0fdf4;
+  border: 0;
+  cursor: pointer;
+}
+
+/* Fortschrittsbalken: einfarbig, ohne Streifen */
+.progress-stripes {
+  position: relative;
+}
+
+/* Frueher: Glanz auf dem SPIELEN-Button (entfernt) */
+.shine {
+  position: relative;
+}
+
+/* Animationen aus (Einstellungen) */
+.no-motion *,
+.no-motion *::before,
+.no-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* Seitenwechsel: ohne Animation */
+.page-enter {
+  animation: none;
+}
+
+/* Markdown aus Modrinth-Beschreibungen */
+.md h1,
+.md h2,
+.md h3 {
+  @apply mb-2 mt-4 font-display font-bold text-accent-200;
+}
+.md h1 {
+  @apply text-xl;
+}
+.md h2 {
+  @apply text-lg;
+}
+.md p {
+  @apply my-2 leading-relaxed text-ink-100/85;
+}
+.md a {
+  @apply text-accent-300 underline decoration-accent-400/40 hover:decoration-accent-300;
+}
+.md ul {
+  @apply my-2 list-disc pl-6 text-ink-100/85;
+}
+.md img {
+  @apply my-2 max-w-full rounded-lg;
+}
+.md code {
+  @apply rounded bg-black/40 px-1 py-0.5 font-mono text-xs text-accent-100;
+}
+
+/* unbestimmter Fortschritt */
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(330%);
+  }
+}

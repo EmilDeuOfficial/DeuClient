@@ -1,0 +1,35 @@
+DeuClient Proprietary License
+
+Copyright (c) 2026 EmilDeuOfficial. All rights reserved.
+
+1. Ownership
+   DeuClient (the launcher, its source code, graphics, texts and build files, "the Software")
+   is the property of EmilDeuOfficial. No rights are granted except those listed below.
+
+2. Permitted use
+   You may download the official release builds of DeuClient and run them for your own
+   personal, non-commercial use.
+
+3. Prohibited
+   Without prior written permission from the copyright holder you may NOT:
+   - copy, duplicate or mirror the Software or any part of it,
+   - modify, adapt, translate or create derivative works,
+   - publish, distribute, sublicense, rent, lend or sell the Software or any part of it,
+   - rebrand, rename or re-release the Software or a modified version of it,
+   - reverse engineer, decompile or extract assets (logos, textures, icons) from the Software,
+   - use the name "DeuClient" or its logo for your own projects.
+   Viewing the source code does not grant any of these rights. The only exception is what the
+   GitHub Terms of Service require for viewing and forking repositories on GitHub itself.
+
+4. Third-party components
+   The Software contains or downloads third-party components (for example Electron, React,
+   Minecraft, Fabric, Modrinth content and bundled mods). These remain under their own licenses and
+   are not covered by this license.
+
+5. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. IN NO EVENT
+   SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE
+   USE OF THE SOFTWARE.
+
+6. Not affiliated with Mojang
+   DeuClient is an unofficial launcher. It is not approved by or associated with Mojang or Microsoft.

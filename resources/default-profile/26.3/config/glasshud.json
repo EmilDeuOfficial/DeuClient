@@ -1,0 +1,13 @@
+{
+  "accent": 0,
+  "opacity": 85,
+  "hideVanillaEffects": true,
+  "editorKey": {
+    "key": 65,
+    "ctrl": false,
+    "shift": false,
+    "alt": false
+  },
+  "configVersion": 1,
+  "widgets": {}
+}

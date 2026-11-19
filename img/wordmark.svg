@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 256" width="800" height="256">
+  <!-- DeuClient-Schriftzug -->
+  <defs>
+    <linearGradient id="goldText" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#bbf7d0"/>
+      <stop offset="0.5" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#15803d"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#bbf7d0"/>
+      <stop offset="0.45" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#166534"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4ade80"/>
+      <stop offset="1" stop-color="#0b1f12"/>
+    </linearGradient>
+  </defs>
+  <!-- Emblem links -->
+  <g transform="translate(20,20) scale(0.42)">
+    <polygon points="256,62 424,232 256,446 88,232" fill="url(#gold)"/>
+    <polygon points="256,128 362,234 256,374 150,234" fill="url(#core)"/>
+    <path d="M256 168 Q263 222 316 234 Q263 246 256 302 Q249 246 196 234 Q249 222 256 168 Z" fill="#dcfce7"/>
+  </g>
+  <text x="236" y="170" font-family="Segoe UI" font-weight="bold" font-size="100" letter-spacing="6"
+        fill="url(#goldText)" stroke="#052e16" stroke-width="5" paint-order="stroke">DEUCLIENT</text>
+</svg>

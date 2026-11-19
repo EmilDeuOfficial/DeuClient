@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "divinecore",
+  "version": "${version}",
+  "name": "DeuCore",
+  "description": "DeuClient für Minecraft: eigenes Hauptmenü, Ladebildschirm, Mod-Menü (Rechts-Shift), Capes, Flügel, DeuClient-Logo neben Namen, Zoom und Fadenkreuz. Rein optisch – keine Cheats.",
+  "authors": ["EmilDeuOfficial"],
+  "license": "All-Rights-Reserved",
+  "icon": "assets/divinecore/icon.png",
+  "environment": "client",
+  "jars": [{ "file": "META-INF/jars/GlassHUD-1.0.0-mc26.3.jar" }],
+  "entrypoints": {
+    "client": ["eu.divinesmp.divinecore.DivineCore"]
+  },
+  "mixins": ["divinecore.mixins.json"],
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}

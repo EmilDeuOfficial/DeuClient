@@ -1,0 +1,50 @@
+{
+  "capes": [
+    {
+      "id": "gold",
+      "name": "Gold"
+    },
+    {
+      "id": "nacht",
+      "name": "Sternennacht"
+    },
+    {
+      "id": "flamme",
+      "name": "Flamme"
+    },
+    {
+      "id": "eis",
+      "name": "Eiskristall"
+    },
+    {
+      "id": "smaragd",
+      "name": "Smaragd"
+    }
+  ],
+  "wings": [
+    {
+      "id": "engel",
+      "name": "Engel"
+    },
+    {
+      "id": "daemon",
+      "name": "Dämon"
+    },
+    {
+      "id": "eis",
+      "name": "Eis"
+    },
+    {
+      "id": "phoenix",
+      "name": "Phönix"
+    },
+    {
+      "id": "schatten",
+      "name": "Schatten"
+    },
+    {
+      "id": "smaragd",
+      "name": "Smaragd"
+    }
+  ]
+}
