@@ -6,6 +6,6 @@ import ConsoleApp from './ConsoleApp';
 import './index.css';
 
 const isConsole = window.location.hash.replace('#', '') === 'console';
-document.title = isConsole ? 'DeuClient – Konsole' : 'DeuClient';
+document.title = isConsole ? 'DeuClient - Konsole' : 'DeuClient';
 
 createRoot(document.getElementById('root')!).render(<StrictMode>{isConsole ? <ConsoleApp /> : <App />}</StrictMode>);

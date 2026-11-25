@@ -1,6 +1,6 @@
 /**
  * Gemeinsame Typen für Main-Prozess (electron/) und Oberfläche (src/).
- * Nur Typen – nichts hiervon existiert zur Laufzeit.
+ * Nur Typen - nichts hiervon existiert zur Laufzeit.
  */
 
 export type Language = 'de' | 'en';
@@ -30,7 +30,7 @@ export interface Instance {
   icon: string;
   created: number;
   lastPlayed?: number;
-  /** Standard-Modpack "DeuClient" – kann nicht gelöscht werden */
+  /** Standard-Modpack "DeuClient" - kann nicht gelöscht werden */
   isDefault?: boolean;
   /** Gesamte Spielzeit in Millisekunden */
   playTimeMs?: number;
@@ -39,7 +39,9 @@ export interface Instance {
   /** Kurzbeschreibung des Modpacks */
   description?: string;
   /** interne Migrationsversion des Standard-Modpacks */
-  divineVersion?: number;
+  deuVersion?: number;
+  /** Modpack ohne die DeuClient-Mods (DeuCore, HUD, Discord, Scout) - reines Fabric mit eigenen Mods */
+  noDeu?: boolean;
 }
 
 export interface WorldInfo {
@@ -71,6 +73,8 @@ export interface NewInstanceInput {
   mcVersion: string;
   loader: LoaderType;
   icon: string;
+  /** ohne DeuClient-Mods (nur Fabric) */
+  noDeu?: boolean;
 }
 
 export interface Settings {
@@ -90,8 +94,6 @@ export interface Settings {
   launchOnStartup: boolean;
   /** Animationen und Uebergaenge in der Oberflaeche */
   animations: boolean;
-  /** Partikel im Hintergrund */
-  particles: boolean;
   /** Prozess-Prioritaet von Minecraft */
   gamePriority: 'normal' | 'high';
 }
@@ -117,7 +119,7 @@ export interface LaunchOptions {
 }
 
 export interface ProgressEvent {
-  stage: 'auth' | 'version' | 'java' | 'libraries' | 'assets' | 'natives' | 'prepare' | 'launch' | 'running' | 'done' | 'error' | 'download';
+  stage: 'auth' | 'version' | 'java' | 'libraries' | 'assets' | 'natives' | 'prepare' | 'launch' | 'running' | 'done' | 'error' | 'download' | 'idle';
   text: string;
   /** 0..1, -1 = unbestimmt */
   percent: number;
@@ -232,9 +234,9 @@ export interface InstalledContent {
   versionId?: string;
   versionNumber?: string;
   iconUrl?: string;
-  /** DivineCore – vom Launcher verwaltet, immer aktiv */
+  /** DeuCore - vom Launcher verwaltet, immer aktiv */
   managed?: boolean;
-  /** mitgelieferte Divine-Mod (z. B. Glass HUD) – kann deaktiviert, aber nicht gelöscht werden */
+  /** mitgelieferte DeuClient-Mod (z. B. Glass HUD) - kann deaktiviert, aber nicht gelöscht werden */
   bundled?: boolean;
   description?: string;
   update?: { versionId: string; versionNumber: string };
@@ -314,7 +316,7 @@ export interface CustomCape {
 }
 
 export interface EquippedCosmetics {
-  /** eingebaute ID (z. B. "divine"), "custom:<id>" oder "" */
+  /** eingebaute ID (z. B. "deu"), "custom:<id>" oder "" */
   cape: string;
   wings: string;
 }

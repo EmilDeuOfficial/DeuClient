@@ -1,4 +1,4 @@
-// DivineCore – rein optische Fabric-Mod für DeuClient
+// DeuCore - rein optische Fabric-Mod für DeuClient
 plugins {
     id 'fabric-loom' version "${loom_version}"
 }
@@ -14,7 +14,7 @@ dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
     modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    // Bewusst KEINE Fabric API: DivineCore soll ohne weitere Abhängigkeiten laufen
+    // Bewusst KEINE Fabric API: DeuCore soll ohne weitere Abhängigkeiten laufen
 }
 
 processResources {

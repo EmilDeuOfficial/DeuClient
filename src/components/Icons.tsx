@@ -51,7 +51,7 @@ const paths = {
 export type IconName = keyof typeof paths;
 
 /** Optischer Ausgleich fuer Icons, deren Pfad nicht mittig im 24x24-Feld liegt */
-const OFFSET: Partial<Record<IconName, string>> = { puzzle: 'translate(0 1.2)' };
+const OFFSET: Partial<Record<IconName, string>> = { puzzle: 'translate(0 1.2)', logout: 'translate(1 0)' };
 
 export function Icon({ name, size = 18, strokeWidth = 2, ...rest }: { name: IconName; size?: number; strokeWidth?: number } & SVGProps<SVGSVGElement>) {
   const filled = name === 'play' || name === 'stop' || name === 'sparkle';

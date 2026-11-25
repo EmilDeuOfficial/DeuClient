@@ -1,14 +1,14 @@
 /**
- * DeuClient – Electron-Main-Prozess.
+ * DeuClient - Electron-Main-Prozess.
  * Erstellt das rahmenlose Hauptfenster, das Konsolenfenster und registriert alle IPC-Kanäle.
  */
-import { app, BrowserWindow, dialog, ipcMain, shell, nativeImage } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, screen, shell, nativeImage } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { EventMap, LaunchOptions, ProgressEvent, Settings } from '../shared/types';
 import * as accounts from './auth/accounts';
-import { divineCoreInfo, managedModsFor, removedManaged, restoreManaged } from './game/divinecore';
+import { deuCoreInfo, managedModsFor, removedManaged, restoreManaged } from './game/deucore';
 import * as instances from './game/instances';
 import { findJavaInstalls, downloadTemurin } from './game/java';
 import { getGameState, killGame, launchGame } from './game/launch';
@@ -17,8 +17,10 @@ import * as modrinth from './modrinth';
 import * as servers from './servers';
 import * as capes from './capes';
 import { fetchJson } from './util/download';
+import { friendlyMessage } from './util/errors';
 import { getSettings, saveSettings } from './settings';
 import { checkForUpdates, getUpdateStatus, initUpdater, installUpdate } from './updater';
+import { migrateLegacyData } from './util/migrate';
 import { DATA_DIR, ensureBaseDirs, paths } from './util/paths';
 
 const isDev = !!process.env.VITE_DEV_SERVER_URL;
@@ -64,11 +66,15 @@ function secureWebContents(win: BrowserWindow) {
 function createMainWindow() {
   // DEUCLIENT_WINDOW=<Breite>x<Hoehe>: nur fuer Tests (Layout bei verschiedenen Fenstergroessen pruefen)
   const [testW, testH] = (process.env.DEUCLIENT_WINDOW ?? '').split('x').map(Number);
+  // Fenster nie groesser als der nutzbare Bildschirm (sonst verschwindet unten etwas hinter der Taskleiste)
+  const work = screen.getPrimaryDisplay().workAreaSize;
+  const startW = Math.min(testW || 1240, work.width);
+  const startH = Math.min(testH || 780, work.height);
   mainWindow = new BrowserWindow({
-    width: testW || 1240,
-    height: testH || 780,
-    minWidth: testW ? Math.min(testW, 900) : 900,
-    minHeight: testH ? Math.min(testH, 580) : 580,
+    width: startW,
+    height: startH,
+    minWidth: Math.min(900, startW),
+    minHeight: Math.min(580, startH),
     frame: false, // eigene Titelleiste
     backgroundColor: '#0a0d0b',
     title: 'DeuClient',
@@ -110,7 +116,7 @@ function openConsoleWindow() {
     minHeight: 320,
     frame: false,
     backgroundColor: '#050706',
-    title: 'DeuClient – Konsole',
+    title: 'DeuClient - Konsole',
     icon: nativeImage.createFromPath(ICON),
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
@@ -142,7 +148,7 @@ function handle(channel: string, fn: (...args: any[]) => unknown) {
       return { ok: true, data: await fn(...args) };
     } catch (err) {
       console.error(`[IPC ${channel}]`, err);
-      return { ok: false, error: (err as Error)?.message ?? String(err) };
+      return { ok: false, error: friendlyMessage(err) };
     }
   });
 }
@@ -176,7 +182,7 @@ function registerIpc() {
   handle('shell:openExternal', (url: string) => {
     if (/^https:\/\//.test(url)) return shell.openExternal(url);
   });
-  handle('divinecore:info', () => divineCoreInfo());
+  handle('deucore:info', () => deuCoreInfo());
 
   // Updates
   handle('update:status', () => getUpdateStatus());
@@ -295,8 +301,11 @@ function registerIpc() {
       await launchGame(opts, { progress, log: pushLog, state: (s) => emit('game:state', s) });
       emit('instances:changed', instances.listInstances());
     } catch (e) {
-      pushLog([`[DeuClient] FEHLER: ${(e as Error).message}`]);
-      emit('launch:progress', { stage: 'error', text: (e as Error).message, percent: 1 });
+      const friendly = friendlyMessage(e);
+      pushLog([`[DeuClient] FEHLER: ${friendly}`]);
+      if (friendly !== (e as Error).message) pushLog([`[DeuClient] Technische Details: ${(e as Error).message}`]);
+      if ((e as { accountsChanged?: boolean }).accountsChanged) emit('accounts:changed', accounts.getAccountsState());
+      emit('launch:progress', { stage: 'error', text: friendly, percent: 1 });
       throw e;
     }
   });
@@ -324,16 +333,27 @@ function registerIpc() {
 
   // Shop: eigene Capes
   handle('capes:list', () => capes.listCapes());
-  handle('capes:save', (name: string, png: string) => capes.saveCape(name, png));
+  handle('capes:save', (name: string, png: string, id?: string) => capes.saveCape(name, png, id));
   handle('capes:delete', (id: string) => capes.deleteCape(id));
   handle('capes:equipped', () => capes.getEquipped());
   handle('capes:equip', (sel) => capes.equip(sel));
 
   // Java
   handle('java:list', () => findJavaInstalls());
-  handle('java:download', async (major: number) =>
-    downloadTemurin(major, (text, percent) => emit('download:progress', { stage: 'java', text, percent })),
-  );
+  let finishTimer: ReturnType<typeof setTimeout> | undefined;
+  const startDownload = () => clearTimeout(finishTimer);
+  const finishDownload = () => {
+    clearTimeout(finishTimer);
+    finishTimer = setTimeout(() => emit('download:progress', { stage: 'idle', text: '', percent: 1 }), 1500);
+  };
+  handle('java:download', async (major: number) => {
+    startDownload();
+    try {
+      return await downloadTemurin(major, (text, percent) => emit('download:progress', { stage: 'java', text, percent }));
+    } finally {
+      finishDownload();
+    }
+  });
   handle('dialog:pickJava', async () => {
     const r = await dialog.showOpenDialog(mainWindow!, {
       title: 'Java auswählen (javaw.exe)',
@@ -349,9 +369,14 @@ function registerIpc() {
   handle('modrinth:project', (id: string) => modrinth.project(id));
   handle('modrinth:projects', (ids: string[]) => modrinth.projects(ids));
   handle('modrinth:versions', (id: string, loaders?: string[], gv?: string[]) => modrinth.projectVersions(id, loaders, gv));
-  handle('modrinth:install', (instId: string, projectId: string, type, versionId?: string) =>
-    modrinth.install(instId, projectId, type, versionId, (e) => emit('download:progress', e)),
-  );
+  handle('modrinth:install', async (instId: string, projectId: string, type, versionId?: string) => {
+    startDownload();
+    try {
+      return await modrinth.install(instId, projectId, type, versionId, (e) => emit('download:progress', e));
+    } finally {
+      finishDownload();
+    }
+  });
   handle('modrinth:installed', (instId: string, type) => modrinth.listInstalled(instId, type));
   handle('modrinth:toggle', (instId: string, type, file: string) => modrinth.toggle(instId, type, file));
   handle('modrinth:remove', (instId: string, type, file: string) => modrinth.remove(instId, type, file));
@@ -366,9 +391,14 @@ function registerIpc() {
       properties: ['openFile'],
     });
     if (r.canceled) return null;
-    const inst = await modrinth.importMrpack(r.filePaths[0], (e) => emit('download:progress', e));
-    emit('instances:changed', instances.listInstances());
-    return inst;
+    startDownload();
+    try {
+      const inst = await modrinth.importMrpack(r.filePaths[0], (e) => emit('download:progress', e));
+      emit('instances:changed', instances.listInstances());
+      return inst;
+    } finally {
+      finishDownload();
+    }
   });
 
   // Konsole
@@ -399,6 +429,7 @@ if (!process.env.DEUCLIENT_SCREENSHOT && !app.requestSingleInstanceLock()) {
   app.setAppUserModelId('eu.deuclient.app'); // eigenes Taskleisten-Icon unter Windows
   app.whenReady().then(() => {
     ensureBaseDirs();
+    migrateLegacyData(); // Daten aus der Zeit vor der Umbenennung auf die neuen Namen heben, bevor Einstellungen und Instanzen gelesen werden
     registerIpc();
     servers.setServerEmitter((channel, payload) => emit(channel as keyof EventMap, payload as never));
     createMainWindow();

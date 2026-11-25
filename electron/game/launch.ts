@@ -5,7 +5,7 @@
  *   3. Passendes Java finden oder Temurin herunterladen
  *   4. Client-JAR, Libraries und Assets parallel laden (SHA1-geprüft)
  *   5. Natives entpacken
- *   6. Instanz vorbereiten (DivineCore-Mod)
+ *   6. Instanz vorbereiten (DeuCore-Mod)
  *   7. Java-Argumente bauen und Spiel starten
  */
 import fs from 'node:fs';
@@ -18,8 +18,10 @@ import { getActiveSession } from '../auth/accounts';
 import { getSettings } from '../settings';
 import { downloadAll, downloadFile, type DownloadTask } from '../util/download';
 import { paths } from '../util/paths';
+import { friendlyMessage } from '../util/errors';
 import { readJson } from '../util/store';
-import { syncDivineCore } from './divinecore';
+import { applyToInstance as applyCosmetics } from '../capes';
+import { syncDeuCore } from './deucore';
 import { addPlayTime, getInstance, instanceDir, prepareOptions, updateInstance } from './instances';
 import { downloadTemurin, findJavaFor } from './java';
 import { resolveVersion, type Argument, type Library, type Rule, type VersionJson } from './versions';
@@ -127,7 +129,7 @@ function resolveLibraries(version: VersionJson): ResolvedLibraries {
 }
 
 function extractNatives(natives: ResolvedLibraries['natives'], dir: string) {
-  const marker = path.join(dir, '.divine-extracted');
+  const marker = path.join(dir, '.deu-extracted');
   if (fs.existsSync(marker)) return;
   fs.mkdirSync(dir, { recursive: true });
   for (const n of natives) {
@@ -243,9 +245,10 @@ export async function launchGame(opts: LaunchOptions, hooks: LaunchHooks): Promi
   extractNatives(libs.natives, nativesDir);
 
   // 7. Instanz vorbereiten
-  p('prepare', 'Bereite Instanz vor', 0.95);
+  p('prepare', 'Bereite Instanz vor', 0.95);
   prepareOptions(inst);
-  hooks.log([`[DeuClient] ${await syncDivineCore(inst)}`]);
+  hooks.log([`[DeuClient] ${await syncDeuCore(inst)}`]);
+  applyCosmetics(inst);
 
   // 8. Argumente
   const join = opts.joinServer?.trim();
@@ -281,6 +284,10 @@ export async function launchGame(opts: LaunchOptions, hooks: LaunchHooks): Promi
 
   const ram = inst.ramMb || settings.ramMb;
   const jvm = [`-Xmx${ram}M`, `-Xms${Math.min(1024, ram)}M`, ...splitArgs(settings.jvmArgs)];
+  // Skin-URL fuer den Kopf im Hauptmenue (Mojang-Session-Server begrenzt Anfragen)
+  if (session.skinUrl) jvm.push(`-Ddeuclient.skin=${session.skinUrl}`);
+  // Datenordner des Launchers: DeuCore meldet hier die im Spiel gewaehlten Cosmetics zurueck (cosmetics.json)
+  jvm.push(`-Ddeuclient.data=${paths.data}`);
   if (version.arguments?.jvm) jvm.push(...expandArgs(version.arguments.jvm, vars, features));
   else jvm.push(...expandArgs(['-Djava.library.path=${natives_directory}', '-cp', '${classpath}'], vars, features));
 
@@ -354,7 +361,7 @@ export async function launchGame(opts: LaunchOptions, hooks: LaunchHooks): Promi
   child.stderr?.on('data', onData);
 
   child.on('error', (e) => {
-    hooks.log([`[DeuClient] Fehler beim Start: ${e.message}`]);
+    hooks.log([`[DeuClient] Fehler beim Start: ${friendlyMessage(e)}`, `[DeuClient] Technische Details: ${e.message}`]);
   });
   child.on('exit', (code) => {
     clearInterval(flush);

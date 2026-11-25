@@ -1,13 +1,16 @@
 /**
- * Shop: Capes und Flügel ansehen und anlegen, eigene Capes im Pixel-Editor gestalten
- * oder als Bild hochladen. Alles kostenlos – "Anlegen" überträgt die Auswahl in alle
- * Modpacks mit DeuCore.
+ * Shop: Die DeuClient-Capes und -Flügel lassen sich hier nur am eigenen Skin ausprobieren (Vorschau) -
+ * gekauft werden können sie erst, wenn sie live gehen. Eigene Capes (Editor / Upload) können angelegt
+ * werden: "Anlegen" überträgt die Auswahl in alle Modpacks mit DeuCore.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CustomCape, EquippedCosmetics } from '../../shared/types';
 import { api } from '../api';
+import { tx } from '../autotranslate';
+import { confirmDialog } from '../components/Confirm';
 import { Checkbox, ColorInput } from '../components/Controls';
 import { Icon } from '../components/Icons';
+import { Player3D } from '../components/Player3D';
 import { useApp } from '../store';
 
 const CAPES = [
@@ -21,36 +24,81 @@ const WINGS = [
 
 type Tab = 'catalog' | 'editor' | 'mine';
 
+/** Startwerte fuer den Cape-Editor (neues Bild oder ein gespeichertes Cape zum Bearbeiten) */
+interface EditorSeed { grid: string[]; res: number; name: string; edge?: string; id?: string }
+
 export function Shop() {
   const { toast } = useApp();
   const [tab, setTab] = useState<Tab>('catalog');
   const [equipped, setEquipped] = useState<EquippedCosmetics>({ cape: '', wings: '' });
   const [mine, setMine] = useState<CustomCape[]>([]);
-  const [editorSeed, setEditorSeed] = useState<string[] | null>(null);
+  const [editorSeed, setEditorSeed] = useState<EditorSeed | null>(null);
 
   const reload = useCallback(async () => {
     setEquipped(await api.capes.equipped());
     setMine(await api.capes.list());
   }, []);
   useEffect(() => void reload(), [reload]);
+  // im Spiel gewaehlte Cosmetics uebernehmen, sobald man zum Launcher zurueckkehrt
+  useEffect(() => {
+    const onFocus = () => void reload();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [reload]);
+
+  /** Gespeichertes Cape in den Editor laden (Vorderseite -> Raster) */
+  const editCape = async (c: CustomCape) => {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('Cape konnte nicht gelesen werden'));
+      i.src = c.dataUrl;
+    }).catch((e: Error) => { toast(e.message, 'error'); return null; });
+    if (!img) return;
+    const k = Math.max(1, Math.round(img.width / 64));
+    const res = Math.min(k, 2); // der Editor arbeitet mit 10×16 oder 20×32 Pixeln
+    const cols = W * res, rows = H * res;
+    // Vorderseite des Capes in Editor-Aufloesung (HD-Capes werden dabei sauber verkleinert)
+    const cv = document.createElement('canvas');
+    cv.width = cols;
+    cv.height = rows;
+    const ctx = cv.getContext('2d', { willReadFrequently: true })!;
+    ctx.imageSmoothingEnabled = k > res;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, k, k, 10 * k, 16 * k, 0, 0, cols, rows);
+    const data = ctx.getImageData(0, 0, cols, rows).data;
+    const grid = Array.from({ length: cols * rows }, (_, i) => {
+      const [r, g, b, a] = [data[i * 4], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]];
+      return a < 40 ? '#0a110c' : `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    });
+    const px = document.createElement('canvas');
+    px.width = px.height = 1;
+    const pctx = px.getContext('2d', { willReadFrequently: true })!;
+    pctx.drawImage(img, 0, 0, 1, 1, 0, 0, 1, 1);
+    const [er, eg, eb] = pctx.getImageData(0, 0, 1, 1).data;
+    const edge = `#${[er, eg, eb].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    if (k > 2) toast('HD-Cape: für die Bearbeitung wird es auf 128×64 verkleinert', 'info');
+    setEditorSeed({ grid, res, name: c.name, edge, id: c.id });
+    setTab('editor');
+  };
 
   const equip = async (sel: EquippedCosmetics) => {
     try {
       const n = await api.capes.equip(sel);
       setEquipped(sel);
-      toast(n ? `Angelegt in ${n} Modpack${n === 1 ? '' : 's'} ✓` : 'Gespeichert – wird in Modpacks mit DeuCore übernommen', 'success');
+      toast(n ? `Angelegt in ${n} Modpack${n === 1 ? '' : 's'} ✓` : 'Gespeichert - wird in Modpacks mit DeuCore übernommen', 'success');
     } catch (e) {
       toast((e as Error).message, 'error');
     }
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 pb-28">
+    <div className="mx-auto max-w-6xl space-y-5">
       <div className="flex items-end justify-between gap-6">
         <div>
           <h2 className="font-display text-3xl font-black text-accent-gradient">Shop</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-200/60">
-            Capes und Flügel für den DeuClient – alles kostenlos. Gestalte dein eigenes Cape oder lade ein Bild hoch.
+            Probiere die DeuClient-Capes und -Flügel an deinem eigenen Skin aus. Kaufen kannst du sie, sobald sie live gehen. Gestalte außerdem dein eigenes Cape oder lade ein Bild hoch.
           </p>
         </div>
       </div>
@@ -68,10 +116,10 @@ export function Shop() {
         ))}
       </div>
 
-      {tab === 'catalog' && <Catalog equipped={equipped} onEquip={equip} />}
+      {tab === 'catalog' && <Catalog />}
       {tab === 'editor' && (
         <CapeEditor
-          key={editorSeed ? editorSeed.join('') : 'new'}
+          key={editorSeed ? (editorSeed.id ?? editorSeed.grid.join('')) : 'new'}
           seed={editorSeed}
           onSaved={async (cape) => {
             await reload();
@@ -86,6 +134,7 @@ export function Shop() {
           capes={mine}
           equipped={equipped}
           onEquip={(id) => equip({ ...equipped, cape: `custom:${id}` })}
+          onEdit={(c) => void editCape(c)}
           onDelete={async (id) => {
             await api.capes.remove(id);
             await reload();
@@ -93,11 +142,11 @@ export function Shop() {
           onUploaded={async (result) => {
             if (result.kind === 'saved') {
               await reload();
-              toast('Cape hochgeladen ✓', 'success');
+              toast('Cape in bester Qualität importiert ✓', 'success');
             } else {
-              setEditorSeed(result.grid);
+              setEditorSeed({ grid: result.grid, res: 1, name: 'Mein Cape' });
               setTab('editor');
-              toast('Bild ins Cape-Format umgewandelt – du kannst es jetzt noch anpassen', 'info');
+              toast('Bild ins Cape-Format umgewandelt - du kannst es jetzt noch anpassen', 'info');
             }
           }}
         />
@@ -108,8 +157,8 @@ export function Shop() {
 
 /* ====================== Vorschau-Bausteine ====================== */
 
-/** Zeichnet die Vorderseite eines Capes (Bereich 1,1 – 10×16). HD-Capes werden weich skaliert, Pixel-Capes scharf. */
-function CapeFront({ src, size = 64 }: { src: string; size?: number }) {
+/** Zeichnet die Vorderseite eines Capes (Bereich 1,1 - 10×16). HD-Capes werden weich skaliert, Pixel-Capes scharf. */
+function CapeFront({ src, size = 64, crisp = false }: { src: string; size?: number; crisp?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const [scale, setScale] = useState(1);
   useEffect(() => {
@@ -122,36 +171,38 @@ function CapeFront({ src, size = 64 }: { src: string; size?: number }) {
       if (!c || !ctx) return;
       c.width = 10 * k;
       c.height = 16 * k;
-      ctx.imageSmoothingEnabled = k > 1;
+      // Pixel-Capes (64×32 / 128×64) scharf mit harten Kanten, nur echte HD-Capes weich skalieren
+      ctx.imageSmoothingEnabled = k > 2 && !crisp;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(img, 1 * k, 1 * k, 10 * k, 16 * k, 0, 0, 10 * k, 16 * k);
     };
     img.src = src;
-  }, [src]);
-  return <canvas ref={ref} width={10} height={16} style={{ width: (size * 10) / 16, height: size, imageRendering: scale > 1 ? 'auto' : 'pixelated' }} className="rounded-md shadow-card" />;
+  }, [src, crisp]);
+  return <canvas ref={ref} width={10} height={16} style={{ width: (size * 10) / 16, height: size, imageRendering: scale > 2 && !crisp ? 'auto' : 'pixelated' }} className="rounded-md shadow-card" />;
 }
 
+/** Menue-Vorschau eines Fluegels (256x256, Schulter bei ca. 12 % / 55 %, Fluegel nach rechts); die linke Haelfte ist gespiegelt */
 function WingPair({ id, size = 56 }: { id: string; size?: number }) {
-  const src = `./cosmetics/wings/${id}.png`;
+  const src = `./cosmetics/wings/${id}_ui.png`;
   return (
     <div className="flex">
       <img src={src} alt="" style={{ width: size, height: size, transform: 'scaleX(-1)' }} />
-      <img src={src} alt="" style={{ width: size, height: size, marginLeft: -6 }} />
+      <img src={src} alt="" style={{ width: size, height: size, marginLeft: -0.24 * size }} />
     </div>
   );
 }
 
-function Tile({ active, children, title, action, onAction, disabled }: { active: boolean; children: React.ReactNode; title: string; action: string; onAction: () => void; disabled?: boolean }) {
+function Tile({ active, children, title, action, onAction, disabled, note = 'Kostenlos', activeLabel = 'Angelegt' }: { active: boolean; children: React.ReactNode; title: string; action: string; onAction: () => void; disabled?: boolean; note?: string; activeLabel?: string }) {
   return (
     <div className={`card flex flex-col items-center gap-3 p-4 transition-colors hover:border-accent-400/30 ${active ? 'border-accent-400/60 shadow-accent' : ''}`}>
       <div className="flex h-28 items-center justify-center">{children}</div>
       <div className="text-center">
         <div className="font-bold">{title}</div>
-        <div className="text-[11px] font-semibold text-emerald-300/80">Kostenlos</div>
+        <div className="text-[11px] font-semibold text-emerald-300/80">{note}</div>
       </div>
       <button className={active ? 'btn-ghost w-full !text-accent-200' : 'btn-accent w-full'} disabled={active || disabled} onClick={onAction}>
         {active && <Icon name="check" size={14} />}
-        {active ? 'Angelegt' : action}
+        {active ? activeLabel : action}
       </button>
     </div>
   );
@@ -159,35 +210,43 @@ function Tile({ active, children, title, action, onAction, disabled }: { active:
 
 /* ====================== Katalog ====================== */
 
-function Catalog({ equipped, onEquip }: { equipped: EquippedCosmetics; onEquip: (s: EquippedCosmetics) => void }) {
+function Catalog() {
+  const { accounts } = useApp();
+  const skinUrl = accounts.accounts.find((a) => a.uuid === accounts.activeUuid)?.skinUrl;
+  const [trying, setTrying] = useState<EquippedCosmetics>({ cape: '', wings: '' });
   return (
-    <div className="space-y-6">
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-display text-lg font-bold">Capes</h3>
-          {equipped.cape && <button className="btn-ghost !py-1.5 text-xs" onClick={() => onEquip({ ...equipped, cape: '' })}><Icon name="x" size={12} /> Cape ablegen</button>}
+    <div className="grid grid-cols-[300px_1fr] items-start gap-6">
+      <aside className="card sticky top-2 space-y-3 p-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-display text-lg font-bold">Anprobe</h3>
+          {(trying.cape || trying.wings) && (
+            <button className="btn-ghost !py-1.5 text-xs" onClick={() => setTrying({ cape: '', wings: '' })}><Icon name="x" size={12} /> Zurücksetzen</button>
+          )}
         </div>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
-          {CAPES.map(([id, name]) => (
-            <Tile key={id} active={equipped.cape === id} title={name} action="Anlegen" onAction={() => onEquip({ ...equipped, cape: id })}>
-              <CapeFront src={`./cosmetics/cape/${id}.png`} size={96} />
-            </Tile>
-          ))}
-        </div>
-      </section>
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-display text-lg font-bold">Galaxie-Flügel</h3>
-          {equipped.wings && <button className="btn-ghost !py-1.5 text-xs" onClick={() => onEquip({ ...equipped, wings: '' })}><Icon name="x" size={12} /> Flügel ablegen</button>}
-        </div>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
-          {WINGS.map(([id, name]) => (
-            <Tile key={id} active={equipped.wings === id} title={name} action="Anlegen" onAction={() => onEquip({ ...equipped, wings: id })}>
-              <WingPair id={id} size={64} />
-            </Tile>
-          ))}
-        </div>
-      </section>
+        <Player3D skinUrl={skinUrl} cape={trying.cape} wings={trying.wings} />
+      </aside>
+      <div className="space-y-6">
+        <section>
+          <h3 className="mb-3 font-display text-lg font-bold">Capes</h3>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
+            {CAPES.map(([id, name]) => (
+              <Tile key={id} active={trying.cape === id} title={name} action="Testen" activeLabel="Aktiv" note="Bald kaufbar" onAction={() => setTrying({ ...trying, cape: id })}>
+                <CapeFront src={`./cosmetics/cape/${id}.png`} size={96} />
+              </Tile>
+            ))}
+          </div>
+        </section>
+        <section>
+          <h3 className="mb-3 font-display text-lg font-bold">Galaxie-Flügel</h3>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
+            {WINGS.map(([id, name]) => (
+              <Tile key={id} active={trying.wings === id} title={name} action="Testen" activeLabel="Aktiv" note="Bald kaufbar" onAction={() => setTrying({ ...trying, wings: id })}>
+                <WingPair id={id} size={64} />
+              </Tile>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
@@ -196,21 +255,21 @@ function Catalog({ equipped, onEquip }: { equipped: EquippedCosmetics; onEquip: 
 
 const W = 10, H = 16;
 const PALETTE = [
-  '#22c55e', '#86efac', '#15803d', '#16a34a', '#4ade80', '#14532d', '#0a110c', '#000000',
-  '#ffffff', '#cfd6ea', '#ff5c72', '#c81e3a', '#ff9a1f', '#2be07a', '#0b6b3a', '#4fd1ff', '#1d4ed8', '#5c4033',
+  '#2eff7a', '#9fffc0', '#17a84a', '#1fd35f', '#6bff9e', '#0f7a35', '#0a110c', '#000000',
+  '#ffffff', '#cfd6ea', '#ff5c72', '#c81e3a', '#ff9a1f', '#3dff8a', '#0b7a37', '#4fd1ff', '#1d4ed8', '#5c4033',
 ];
 
 const TEMPLATES: Record<string, (x: number, y: number) => string> = {
   DeuClient: (x, y) => {
-    if (x === 0 || x === 9 || y === 0 || y === 15) return '#22c55e';
+    if (x === 0 || x === 9 || y === 0 || y === 15) return '#2eff7a';
     const d = Math.abs(x - 4.5) + Math.abs(y - 7.5) * 0.8;
-    if (d <= 1.9) return '#dcfce7';
-    if (d <= 3.5) return '#16a34a';
-    return y < 8 ? '#15803d' : '#0f3d22';
+    if (d <= 1.9) return '#e6fff0';
+    if (d <= 3.5) return '#1fd35f';
+    return y < 8 ? '#17a84a' : '#0f4025';
   },
   Leer: () => '#0a110c',
-  Streifen: (x) => (x % 2 === 0 ? '#16a34a' : '#22c55e'),
-  Verlauf: (_x, y) => ['#86efac', '#22c55e', '#16a34a', '#15803d', '#16a34a', '#15803d', '#14532d', '#0f3d22'][Math.floor(y / 2)],
+  Streifen: (x) => (x % 2 === 0 ? '#1fd35f' : '#2eff7a'),
+  Verlauf: (_x, y) => ['#9fffc0', '#2eff7a', '#1fd35f', '#17a84a', '#1fd35f', '#17a84a', '#0f7a35', '#0f4025'][Math.floor(y / 2)],
   Schach: (x, y) => ((x + y) % 2 === 0 ? '#ffffff' : '#000000'),
 };
 /** Vorlage in der gewuenschten Aufloesung (k = 1: 10x16, k = 2: 20x32) */
@@ -256,10 +315,10 @@ function buildCapePng(grid: string[], edge: string, k: number): string {
   return c.toDataURL('image/png');
 }
 
-function CapeEditor({ seed, onSaved }: { seed: string[] | null; onSaved: (c: CustomCape) => void }) {
+function CapeEditor({ seed, onSaved }: { seed: EditorSeed | null; onSaved: (c: CustomCape) => void }) {
   const { toast } = useApp();
-  const [res, setRes] = useState(1); // 1 = 64×32, 2 = 128×64
-  const [grid, setGrid] = useState<string[]>(() => seed ?? fromTemplate('DeuClient', 1));
+  const [res, setRes] = useState(seed?.res ?? 1); // 1 = 64×32, 2 = 128×64
+  const [grid, setGrid] = useState<string[]>(() => seed?.grid ?? fromTemplate('DeuClient', 1));
   const cols = W * res, rows = H * res;
   const changeRes = (next: number) => {
     if (next === res) return;
@@ -267,11 +326,11 @@ function CapeEditor({ seed, onSaved }: { seed: string[] | null; onSaved: (c: Cus
     setHistory([]);
     setRes(next);
   };
-  const [color, setColor] = useState('#22c55e');
-  const [edge, setEdge] = useState('#2a0f52');
+  const [color, setColor] = useState('#2eff7a');
+  const [edge, setEdge] = useState(seed?.edge ?? '#2a0f52');
   const [tool, setTool] = useState<Tool>('pen');
   const [mirror, setMirror] = useState(false);
-  const [name, setName] = useState('Mein Cape');
+  const [name, setName] = useState(seed?.name ?? 'Mein Cape');
   const [history, setHistory] = useState<string[][]>([]);
   const painting = useRef(false);
 
@@ -306,7 +365,7 @@ function CapeEditor({ seed, onSaved }: { seed: string[] | null; onSaved: (c: Cus
       commit(next);
       return;
     }
-    const value = tool === 'eraser' ? edge : color;
+    const value = tool === 'eraser' ? '#ffffff' : color; // Radierer = weisser Hintergrund
     const next = start ? [...grid] : grid.slice();
     next[i] = value;
     if (mirror) next[y * cols + (cols - 1 - x)] = value;
@@ -318,7 +377,7 @@ function CapeEditor({ seed, onSaved }: { seed: string[] | null; onSaved: (c: Cus
 
   const save = async () => {
     try {
-      onSaved(await api.capes.save(name, preview));
+      onSaved(await api.capes.save(name, preview, seed?.id));
     } catch (e) {
       toast((e as Error).message, 'error');
     }
@@ -392,17 +451,17 @@ function CapeEditor({ seed, onSaved }: { seed: string[] | null; onSaved: (c: Cus
             />
           ))}
         </div>
-        <div className="mt-3 text-xs text-ink-200/55">Vorderseite des Capes ({cols} × {rows} Pixel) – Klicken und ziehen zum Malen</div>
+        <div className="mt-3 text-xs text-ink-200/55">{`Vorderseite des Capes (${cols} × ${rows} Pixel) - Klicken und ziehen zum Malen`}</div>
       </section>
 
       {/* Vorschau + Speichern */}
       <section className="card flex flex-col gap-4 p-5">
         <div className="label !mb-0">Vorschau</div>
         <div className="flex items-end justify-center gap-4 rounded-xl bg-ink-900/60 p-5">
-          <CapeFront src={preview} size={128} />
+          <CapeFront src={preview} size={160} crisp />
           <div className="text-center">
             <img src={preview} alt="" style={{ width: 128, height: 64, imageRendering: 'pixelated' }} className="rounded border border-white/10" />
-            <div className="mt-1 text-[10px] text-ink-200/50">Textur {64 * res}×{32 * res} (inkl. Elytra)</div>
+            <div className="mt-1 text-[10px] text-ink-200/50">{`Textur ${64 * res}×${32 * res} (inkl. Elytra)`}</div>
           </div>
         </div>
         <div>
@@ -422,8 +481,41 @@ function CapeEditor({ seed, onSaved }: { seed: string[] | null; onSaved: (c: Cus
 
 type UploadResult = { kind: 'saved' } | { kind: 'convert'; grid: string[] };
 
-function MyCapes({ capes, equipped, onEquip, onDelete, onUploaded }: {
-  capes: CustomCape[]; equipped: EquippedCosmetics; onEquip: (id: string) => void; onDelete: (id: string) => void; onUploaded: (r: UploadResult) => void;
+/** Beliebiges Bild -> vollstaendiges HD-Cape (1024×512, 16-fache Aufloesung): Aussenseite, Innenseite, Raender, Elytra */
+function buildHdCape(img: HTMLImageElement): string {
+  const k = 16;
+  const c = document.createElement('canvas');
+  c.width = 64 * k;
+  c.height = 32 * k;
+  const ctx = c.getContext('2d')!;
+  // Randfarbe = Durchschnittsfarbe des Bildes
+  const avg = document.createElement('canvas');
+  avg.width = avg.height = 1;
+  const actx = avg.getContext('2d')!;
+  actx.drawImage(img, 0, 0, 1, 1);
+  const [r, g, b] = actx.getImageData(0, 0, 1, 1).data;
+  const edge = `rgb(${r},${g},${b})`;
+  ctx.fillStyle = edge;
+  ctx.fillRect(0, 0, 22 * k, 17 * k);
+  ctx.fillRect(22 * k, 0, 24 * k, 22 * k);
+  // Ausschnitt im Seitenverhaeltnis 10:16 (zentriert, ohne Verzerrung)
+  const target = 10 / 16;
+  let sw = img.width, sh = img.height, sx = 0, sy = 0;
+  if (sw / sh > target) { sw = sh * target; sx = (img.width - sw) / 2; } else { sh = sw / target; sy = (img.height - sh) / 2; }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, sx, sy, sw, sh, k, k, 10 * k, 16 * k); // Aussenseite
+  ctx.save();
+  ctx.translate(22 * k, k);
+  ctx.scale(-1, 1);
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, 10 * k, 16 * k); // Innenseite (gespiegelt)
+  ctx.restore();
+  ctx.drawImage(img, sx, sy, sw, sh, 24 * k, 2 * k, 20 * k, 16 * k); // Elytra
+  return c.toDataURL('image/png');
+}
+
+function MyCapes({ capes, equipped, onEquip, onDelete, onEdit, onUploaded }: {
+  capes: CustomCape[]; equipped: EquippedCosmetics; onEquip: (id: string) => void; onDelete: (id: string) => void; onEdit: (c: CustomCape) => void; onUploaded: (r: UploadResult) => void;
 }) {
   const { toast } = useApp();
   const input = useRef<HTMLInputElement>(null);
@@ -434,36 +526,20 @@ function MyCapes({ capes, equipped, onEquip, onDelete, onUploaded }: {
       const img = new Image();
       img.onload = async () => {
         try {
-          const exact = (img.width === 64 && img.height === 32) || (img.width === 128 && img.height === 64);
+          const name = file.name.replace(/\.[^.]+$/, '');
+          const exact = img.width >= 64 && img.width <= 2048 && img.width % 64 === 0 && img.height === img.width / 2;
           if (exact) {
-            // fertiges Cape-Format → direkt speichern (128×64 wird auf 64×32 verkleinert)
+            // fertiges Cape-Format (auch HD) → unveraendert in voller Aufloesung speichern
             const c = document.createElement('canvas');
-            c.width = 64;
-            c.height = 32;
-            const ctx = c.getContext('2d')!;
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(img, 0, 0, 64, 32);
-            await api.capes.save(file.name.replace(/\.[^.]+$/, ''), c.toDataURL('image/png'));
-            onUploaded({ kind: 'saved' });
+            c.width = img.width;
+            c.height = img.height;
+            c.getContext('2d')!.drawImage(img, 0, 0);
+            await api.capes.save(name, c.toDataURL('image/png'));
           } else {
-            // beliebiges Bild → passend zuschneiden und auf 10×16 verkleinern
-            const c = document.createElement('canvas');
-            c.width = W;
-            c.height = H;
-            const ctx = c.getContext('2d')!;
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            const scale = Math.max(W / img.width, H / img.height);
-            const dw = img.width * scale, dh = img.height * scale;
-            ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-            const data = ctx.getImageData(0, 0, W, H).data;
-            const grid = Array.from({ length: W * H }, (_, i) => {
-              const [r, g, b, a] = [data[i * 4], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]];
-              if (a < 40) return '#0a110c';
-              return `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
-            });
-            onUploaded({ kind: 'convert', grid });
+            // beliebiges Bild → in bester Cape-Qualitaet (HD 1024×512) umwandeln
+            await api.capes.save(name, buildHdCape(img));
           }
+          onUploaded({ kind: 'saved' });
         } catch (e) {
           toast((e as Error).message, 'error');
         }
@@ -489,7 +565,7 @@ function MyCapes({ capes, equipped, onEquip, onDelete, onUploaded }: {
           <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-400/15 text-accent-300"><Icon name="upload" size={20} /></span>
           <div>
             <div className="font-bold">Cape hochladen</div>
-            <div className="text-xs text-ink-200/60">PNG im Cape-Format (64×32 / 128×64) wird direkt übernommen – jedes andere Bild wird automatisch zum Cape umgewandelt. Auch per Drag & Drop.</div>
+            <div className="text-xs text-ink-200/60">PNG im Cape-Format (64×32 oder HD) wird unverändert übernommen - jedes andere Bild wird in bester Cape-Qualität (HD 1024×512) umgewandelt. Auch per Drag & Drop.</div>
           </div>
         </div>
         <input ref={input} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ''; }} />
@@ -497,20 +573,23 @@ function MyCapes({ capes, equipped, onEquip, onDelete, onUploaded }: {
       </section>
 
       {!capes.length ? (
-        <div className="card p-10 text-center text-sm text-ink-200/55">Noch keine eigenen Capes – gestalte eins im Cape-Editor oder lade ein Bild hoch.</div>
+        <div className="card p-10 text-center text-sm text-ink-200/55">Noch keine eigenen Capes - gestalte eins im Cape-Editor oder lade ein Bild hoch.</div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(190px,1fr))] gap-4">
           {capes.map((c) => {
             const active = equipped.cape === `custom:${c.id}`;
             return (
               <div key={c.id} className={`card flex flex-col items-center gap-3 p-4 transition-colors hover:border-accent-400/30 ${active ? 'border-accent-400/60 shadow-accent' : ''}`}>
                 <div className="flex h-28 items-center"><CapeFront src={c.dataUrl} size={96} /></div>
                 <div className="w-full truncate text-center font-bold">{c.name}</div>
-                <div className="flex w-full gap-2">
-                  <button className={active ? 'btn-ghost flex-1 !text-accent-200' : 'btn-accent flex-1'} disabled={active} onClick={() => onEquip(c.id)}>
-                    <Icon name={active ? 'check' : 'sparkle'} size={13} /> {active ? 'Angelegt' : 'Anlegen'}
+                <div className="flex w-full flex-col gap-2">
+                  <button className={active ? 'btn-ghost w-full !text-accent-200' : 'btn-accent w-full'} disabled={active} onClick={() => onEquip(c.id)}>
+                    {active && <Icon name="check" size={13} />} {active ? 'Angelegt' : 'Anlegen'}
                   </button>
-                  <button className="btn-icon hover:!border-red-400/50 hover:!text-red-300" onClick={() => confirm(`"${c.name}" löschen?`) && onDelete(c.id)}><Icon name="trash" size={14} /></button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button className="btn-ghost !px-2" onClick={() => onEdit(c)}><Icon name="edit" size={14} /> Bearbeiten</button>
+                    <button className="btn-ghost !px-2 hover:!border-red-400/50 hover:!text-red-300" onClick={async () => { if (await confirmDialog(tx(`"${c.name}" löschen?`), { danger: true, confirmLabel: tx('Löschen') })) onDelete(c.id); }}><Icon name="trash" size={14} /> Löschen</button>
+                  </div>
                 </div>
               </div>
             );

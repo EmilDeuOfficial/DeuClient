@@ -6,11 +6,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { shell } from 'electron';
 import type { Instance, InstanceStats, NewInstanceInput, ScreenshotInfo, WorldInfo } from '../../shared/types';
+import { normalizeLegacyInstance } from '../util/migrate';
 import { defaultProfileDir, paths } from '../util/paths';
 import { readJson, writeJson } from '../util/store';
 
-/** Standard-Instanz (Fabric, DivineCore und Glass-Mods) */
-export const DEFAULT_INSTANCE_ID = 'divinesmp';
+/** Standard-Instanz (Fabric, DeuCore und Glass-Mods) */
+export const DEFAULT_INSTANCE_ID = 'deusmp';
 export const DEFAULT_MC_VERSION = '26.3';
 /** Version des Standard-Modpacks; erhöhen, wenn es migriert werden soll */
 const DEFAULT_PACK_VERSION = 2;
@@ -36,13 +37,14 @@ export function listInstances(): Instance[] {
     .readdirSync(paths.instances)
     .map((d) => readJson<Instance | null>(path.join(paths.instances, d, 'instance.json'), null))
     .filter((i): i is Instance => !!i)
+    .map(normalizeLegacyInstance)
     .sort((a, b) => Number(!!b.isDefault) - Number(!!a.isDefault) || (b.lastPlayed ?? b.created) - (a.lastPlayed ?? a.created));
 }
 
 export function getInstance(id: string): Instance {
   const inst = readJson<Instance | null>(path.join(instanceDir(id), 'instance.json'), null);
   if (!inst) throw new Error(`Instanz "${id}" nicht gefunden`);
-  return inst;
+  return normalizeLegacyInstance(inst);
 }
 
 export function saveInstance(inst: Instance): Instance {
@@ -104,6 +106,7 @@ export function createInstance(input: NewInstanceInput, id?: string): Instance {
     loader: input.loader,
     icon: input.icon || 'grass',
     created: Date.now(),
+    noDeu: input.noDeu && input.loader === 'fabric' ? true : undefined,
   });
   applyProfileTemplate(inst);
   return inst;
@@ -127,7 +130,7 @@ function backupContent(inst: Instance) {
   if (fs.existsSync(mods) && fs.readdirSync(mods).length) {
     fs.renameSync(mods, path.join(dir, `mods_backup_${inst.mcVersion}_${Date.now()}`));
   }
-  for (const f of ['divine-content.json', 'divine-managed.json']) fs.rmSync(path.join(dir, f), { force: true });
+  for (const f of ['deu-content.json', 'deu-managed.json']) fs.rmSync(path.join(dir, f), { force: true });
   fs.mkdirSync(mods, { recursive: true });
 }
 
@@ -229,10 +232,10 @@ export function ensureDefaultInstance(): Instance {
   const file = path.join(instanceDir(DEFAULT_INSTANCE_ID), 'instance.json');
   if (fs.existsSync(file)) {
     const inst = getInstance(DEFAULT_INSTANCE_ID);
-    if ((inst.divineVersion ?? 0) < DEFAULT_PACK_VERSION) {
+    if ((inst.deuVersion ?? 0) < DEFAULT_PACK_VERSION) {
       // Migration (z. B. 1.21.4 → 26.3): alte Mods werden gesichert
       const migrated = updateInstance(inst.id, { mcVersion: DEFAULT_MC_VERSION, loader: 'fabric' });
-      return saveInstance({ ...migrated, divineVersion: DEFAULT_PACK_VERSION, description: DEFAULT_DESCRIPTION });
+      return saveInstance({ ...migrated, deuVersion: DEFAULT_PACK_VERSION, description: DEFAULT_DESCRIPTION });
     }
     // Umbenennung des frueheren Standard-Modpacks "DivineSMP" und aktuelle Beschreibung
     if (inst.name === 'DivineSMP' || inst.description !== DEFAULT_DESCRIPTION) {
@@ -241,13 +244,13 @@ export function ensureDefaultInstance(): Instance {
     return saveInstance(inst); // Unterordner sicherstellen
   }
   const created = saveInstance({
-    divineVersion: DEFAULT_PACK_VERSION,
+    deuVersion: DEFAULT_PACK_VERSION,
     description: DEFAULT_DESCRIPTION,
     id: DEFAULT_INSTANCE_ID,
     name: 'DeuClient',
     mcVersion: DEFAULT_MC_VERSION,
     loader: 'fabric',
-    icon: 'divine',
+    icon: 'deu',
     created: Date.now(),
     isDefault: true,
   });

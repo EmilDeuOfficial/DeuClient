@@ -1,7 +1,7 @@
 {
   "name": "deuclient",
   "productName": "DeuClient",
-  "version": "1.4.0",
+  "version": "1.0.0",
   "description": "DeuClient - Minecraft launcher with its own Fabric client",
   "author": "EmilDeuOfficial",
   "license": "UNLICENSED",

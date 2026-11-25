@@ -30,7 +30,7 @@ export function Home() {
   };
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6 pb-28">
+    <div className="mx-auto flex max-w-6xl flex-col gap-6">
       {/* ---------- Hero ---------- */}
       <section className="card relative overflow-hidden px-10 py-10">
         <div className="absolute right-12 top-1/2 hidden -translate-y-1/2 min-[1120px]:block">
@@ -73,7 +73,7 @@ export function Home() {
                   {selectedInstance && <InstanceIcon icon={selectedInstance.icon} size={36} />}
                   <span className="min-w-0 flex-1">
                     <span className="block text-[10px] font-bold uppercase tracking-widest text-ink-200/50">{t('home.instance')}</span>
-                    <span className="block truncate text-sm font-bold">{selectedInstance?.name ?? '—'}</span>
+                    <span className="block truncate text-sm font-bold">{selectedInstance?.name ?? '-'}</span>
                     <span className="block text-[11px] text-ink-200/60">
                       {selectedInstance?.mcVersion} · {selectedInstance?.loader === 'fabric' ? 'Fabric' : 'Vanilla'}
                     </span>
@@ -90,7 +90,7 @@ export function Home() {
       <div className="grid grid-cols-3 gap-4">
         <MiniStat icon="clock" label={t('home.stats.playtime')} value={formatPlayTime(totalPlay)} />
         <MiniStat icon="package" label={t('home.stats.packs')} value={String(instances.length)} onClick={() => openPack(null)} />
-        <MiniStat icon="puzzle" label={t('home.stats.mods')} value={packMods === null ? '–' : String(packMods)} onClick={() => selectedInstance && openPack(selectedInstance.id)} />
+        <MiniStat icon="puzzle" label={t('home.stats.mods')} value={packMods === null ? '-' : String(packMods)} onClick={() => selectedInstance && openPack(selectedInstance.id)} />
       </div>
 
       <div className="grid grid-cols-1 gap-6 min-[1120px]:grid-cols-2">
@@ -121,7 +121,7 @@ export function Home() {
           </ul>
           <div className="mt-4 flex items-center gap-2 rounded-xl border border-accent-400/25 bg-accent-400/10 px-3 py-2 text-xs font-semibold text-accent-100">
             <kbd className="rounded-md border border-accent-400/40 bg-black/30 px-1.5 py-0.5 font-mono text-[10px]">⇧ R-Shift</kbd>
-            {t('home.divineMenu')}
+            {t('home.deuMenu')}
           </div>
         </div>
       </div>

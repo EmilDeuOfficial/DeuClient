@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ContentType, InstalledContent, Instance, ModrinthCategory, ModrinthHit, ModrinthProject, ModrinthSearchParams, ModrinthVersion } from '../../shared/types';
 import { api } from '../api';
 import { formatNumber, ModIcon, Modal, Toggle } from './Common';
+import { confirmDialog } from './Confirm';
 import { Select } from './Controls';
 import { Icon } from './Icons';
 import { InstanceIcon } from './InstanceIcon';
@@ -243,7 +244,7 @@ function Discover({ inst, type, installedIds, onInstalled }: { inst: Instance; t
   );
 }
 
-/** Kategorie-Icons von Modrinth sind SVG-Strings – Script/Handler entfernen, bevor sie eingefügt werden */
+/** Kategorie-Icons von Modrinth sind SVG-Strings - Script/Handler entfernen, bevor sie eingefügt werden */
 function sanitizeSvg(svg: string): string {
   if (!svg.trim().startsWith('<svg')) return '';
   return svg.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+="[^"]*"/gi, '').replace(/(href|xlink:href)="(?!#)[^"]*"/gi, '');
@@ -458,7 +459,7 @@ function Installed({ inst, type, onChanged }: { inst: Instance; type: ContentTyp
         {items.map((it) => (
           <div key={it.fileName} className={`flex items-center gap-4 px-5 py-3 transition hover:bg-white/[0.02] ${!it.enabled ? 'opacity-50' : ''}`}>
             {it.managed ? (
-              <InstanceIcon icon="divine" size={40} />
+              <InstanceIcon icon="deu" size={40} />
             ) : (
               <ModIcon url={it.iconUrl} className="h-10 w-10 rounded-lg" iconSize={18} />
             )}
@@ -479,7 +480,7 @@ function Installed({ inst, type, onChanged }: { inst: Instance; type: ContentTyp
               </button>
             )}
             <Toggle checked={it.enabled} disabled={it.managed} onChange={() => act(() => api.modrinth.toggle(inst!.id, type, it.fileName))} />
-            <button className="btn-icon hover:!border-red-400/50 hover:!text-red-300" onClick={() => { if ((it.managed || it.bundled) && !confirm(t('mods.confirmManaged'))) return; void act(() => api.modrinth.remove(inst!.id, type, it.fileName)); }}>
+            <button className="btn-icon hover:!border-red-400/50 hover:!text-red-300" onClick={async () => { if ((it.managed || it.bundled) && !(await confirmDialog(t('mods.confirmManaged'), { danger: true, confirmLabel: t('inst.delete') }))) return; void act(() => api.modrinth.remove(inst!.id, type, it.fileName)); }}>
               <Icon name="trash" size={15} />
             </button>
           </div>

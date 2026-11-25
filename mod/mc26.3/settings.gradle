@@ -1,4 +1,4 @@
-// DivineCore für Minecraft 26.3 (unobfuskiert, Mojang-Namen)
+// DeuCore für Minecraft 26.3 (unobfuskiert, Mojang-Namen)
 pluginManagement {
     repositories {
         maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
@@ -6,4 +6,4 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-rootProject.name = 'divinecore'
+rootProject.name = 'deucore'

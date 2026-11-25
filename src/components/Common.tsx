@@ -30,8 +30,8 @@ export function LaunchBar() {
   const error = ev.stage === 'error';
   const done = ev.stage === 'running' || ev.stage === 'done';
   return (
-    <div className="animate-fade-up pointer-events-auto absolute bottom-5 left-1/2 z-40 w-[min(720px,calc(100%-40px))] -translate-x-1/2">
-      <div className={`card px-5 py-4 ${error ? 'border-red-400/40' : done ? 'border-emerald-400/30' : 'border-accent-400/25'}`}>
+    <div className="animate-fade-up pointer-events-auto absolute inset-x-0 bottom-0 z-40">
+      <div className={`border-t bg-ink-850 px-8 py-4 ${error ? 'border-red-400/40' : done ? 'border-accent-400/30' : 'border-white/10'}`}>
         <div className="mb-2.5 flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-2.5">
             <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${error ? 'bg-red-500/20 text-red-300' : done ? 'bg-emerald-500/20 text-emerald-300' : 'bg-accent-400/15 text-accent-300'}`}>

@@ -12,7 +12,7 @@ import type {
   ContentType, InstalledContent, InstallResult, Instance, ModrinthCategory, ModrinthProject,
   ModrinthSearchParams, ModrinthSearchResult, ModrinthVersion, ProgressEvent,
 } from '../shared/types';
-import { DIVINECORE_FILE, managedModsFor, removeManaged } from './game/divinecore';
+import { DEUCORE_FILE, managedModsFor, removeManaged } from './game/deucore';
 import { createInstance, getInstance, instanceDir, saveInstance } from './game/instances';
 import { downloadAll, downloadFile, fetchJson, hashFile } from './util/download';
 import { readJson, writeJson } from './util/store';
@@ -35,7 +35,7 @@ interface IndexEntry {
 }
 type ContentIndex = Record<string, IndexEntry>;
 
-const indexFile = (instId: string) => path.join(instanceDir(instId), 'divine-content.json');
+const indexFile = (instId: string) => path.join(instanceDir(instId), 'deu-content.json');
 const loadIndex = (instId: string) => readJson<ContentIndex>(indexFile(instId), {});
 const saveIndex = (instId: string, idx: ContentIndex) => writeJson(indexFile(instId), idx);
 
@@ -56,7 +56,7 @@ export async function categories(): Promise<ModrinthCategory[]> {
   return categoryCache;
 }
 
-/** Mehrere Projekte auf einmal (für die Extras-Seite) – IDs oder Slugs */
+/** Mehrere Projekte auf einmal (für die Extras-Seite) - IDs oder Slugs */
 export function projects(ids: string[]): Promise<ModrinthProject[]> {
   return fetchJson<ModrinthProject[]>(`${API}/projects?ids=${q(ids)}`);
 }
@@ -75,7 +75,7 @@ export function projectVersions(id: string, loaders?: string[], gameVersions?: s
 function loadersFor(inst: Instance, type: ContentType): string[] | undefined {
   if (type === 'mod') return [inst.loader === 'fabric' ? 'fabric' : 'minecraft'];
   if (type === 'resourcepack') return ['minecraft'];
-  return undefined; // Shader: iris/optifine/canvas … – kein Filter
+  return undefined; // Shader: iris/optifine/canvas … - kein Filter
 }
 
 /** Beste passende Version eines Projekts für die Instanz (bevorzugt "release") */
@@ -179,20 +179,20 @@ export function listInstalled(instanceId: string, type: ContentType): InstalledC
       const enabled = !f.endsWith('.disabled');
       const base = enabled ? f : f.slice(0, -'.disabled'.length);
       const meta = idx[base];
-      const divine = managed.get(base);
+      const bundledMod = managed.get(base);
       return {
         fileName: f,
         enabled,
         type,
         size: fs.statSync(path.join(folder, f)).size,
-        title: divine?.name ?? meta?.title ?? base.replace(/\.(jar|zip)$/i, ''),
-        description: divine?.description,
+        title: bundledMod?.name ?? meta?.title ?? base.replace(/\.(jar|zip)$/i, ''),
+        description: bundledMod?.description,
         projectId: meta?.projectId,
         versionId: meta?.versionId,
         iconUrl: meta?.iconUrl,
-        versionNumber: divine?.version ?? meta?.versionNumber,
-        managed: base === DIVINECORE_FILE || !!divine?.core,
-        bundled: !!divine && !divine.core,
+        versionNumber: bundledMod?.version ?? meta?.versionNumber,
+        managed: base === DEUCORE_FILE || !!bundledMod?.core,
+        bundled: !!bundledMod && !bundledMod.core,
       } satisfies InstalledContent;
     })
     .sort((a, b) => Number(!!b.managed) - Number(!!a.managed) || Number(!!b.bundled) - Number(!!a.bundled) || a.title.localeCompare(b.title));
@@ -200,14 +200,14 @@ export function listInstalled(instanceId: string, type: ContentType): InstalledC
 
 export function toggle(instanceId: string, type: ContentType, fileName: string): void {
   const folder = path.join(instanceDir(instanceId), FOLDERS[type]);
-  if (fileName === DIVINECORE_FILE) throw new Error('DeuCore ist der Kern des Clients und bleibt aktiv. Du kannst es stattdessen löschen.');
+  if (fileName === DEUCORE_FILE) throw new Error('DeuCore ist der Kern des Clients und bleibt aktiv. Du kannst es stattdessen löschen.');
   const target = fileName.endsWith('.disabled') ? fileName.slice(0, -'.disabled'.length) : `${fileName}.disabled`;
   fs.renameSync(path.join(folder, fileName), path.join(folder, target));
 }
 
 export function remove(instanceId: string, type: ContentType, fileName: string): void {
   const base = fileName.replace(/\.disabled$/, '');
-  if (type === 'mod' && (base === DIVINECORE_FILE || managedModsFor(getInstance(instanceId)).some((m) => m.file === base))) {
+  if (type === 'mod' && (base === DEUCORE_FILE || managedModsFor(getInstance(instanceId)).some((m) => m.file === base))) {
     // mitgelieferte Mod: löschen und merken, damit sie nicht wieder hineinkopiert wird
     removeManaged(getInstance(instanceId), base);
     return;

@@ -147,7 +147,10 @@ export function Select<T extends string>({
           renderTrigger({ open, selected })
         ) : (
           <>
-            <span className="min-w-0 truncate">{selected?.label ?? <span className="text-ink-200/40">{placeholder ?? '–'}</span>}</span>
+            <span className="flex min-w-0 items-center gap-2.5">
+              {selected?.icon}
+              <span className="min-w-0 truncate">{selected?.label ?? <span className="text-ink-200/40">{placeholder ?? '-'}</span>}</span>
+            </span>
             <Icon name="chevronDown" size={15} strokeWidth={2.5} className={`shrink-0 text-accent-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
           </>
         )}
@@ -158,7 +161,7 @@ export function Select<T extends string>({
           <div
             ref={list}
             role="listbox"
-            className="animate-fade-up fixed z-[80] overflow-y-auto rounded-xl border border-accent-400/25 bg-ink-850/95 p-1.5 shadow-card"
+            className="animate-fade-up fixed z-[80] flex flex-col gap-1.5 overflow-y-auto rounded-xl border border-accent-400/25 bg-ink-850/95 p-2 shadow-card"
             style={{ left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}
           >
             {options.map((o, i) => {

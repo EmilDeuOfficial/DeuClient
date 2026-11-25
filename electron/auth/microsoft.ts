@@ -40,7 +40,7 @@ export function requestAuthCode(parent?: BrowserWindow): Promise<string> {
       height: 680,
       parent,
       modal: !!parent,
-      title: 'DeuClient – Microsoft-Anmeldung',
+      title: 'DeuClient - Microsoft-Anmeldung',
       backgroundColor: '#141a16',
       autoHideMenuBar: true,
       webPreferences: {

@@ -94,7 +94,7 @@ export async function downloadFile(task: DownloadTask, retries = 3): Promise<boo
       await new Promise((r) => setTimeout(r, 400 * attempt));
     }
   }
-  throw new Error(`Download fehlgeschlagen: ${path.basename(task.dest)} (${task.url}) – ${(lastError as Error)?.message}`);
+  throw new Error(`Download fehlgeschlagen: ${path.basename(task.dest)} (${task.url}) - ${(lastError as Error)?.message}`);
 }
 
 /**

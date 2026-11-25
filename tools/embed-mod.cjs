@@ -1,6 +1,6 @@
 /**
  * Bettet alle vom Launcher verwalteten Mods ein:
- *   - DivineCore für jede Minecraft-Version (mod/mc<version>/build/libs/divinecore-<v>.jar)
+ *   - DeuCore für jede Minecraft-Version (mod/mc<version>/build/libs/deucore-<v>.jar)
  *   - mitgelieferte Mods (resources/bundled-mods/<version>/*.jar, z. B. die Glass-Mods für 26.3)
  *
  * Ergebnis: resources/mods/<version>/*.jar + resources/mods/manifest.json
@@ -32,22 +32,22 @@ function modMeta(jarFile) {
 
 fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
-const manifest = { divinecore: {}, versions: {} };
+const manifest = { deucore: {}, versions: {} };
 
-// 1. DivineCore pro Minecraft-Version
+// 1. DeuCore pro Minecraft-Version
 for (const dir of fs.readdirSync(path.join(root, 'mod')).filter((d) => d.startsWith('mc'))) {
   const props = readProps(path.join(root, 'mod', dir, 'gradle.properties'));
   const mc = props.minecraft_version;
   const jar = path.join(root, 'mod', dir, 'build', 'libs', `${props.archives_base_name}-${props.mod_version}.jar`);
   if (!fs.existsSync(jar)) {
-    console.error(`✗ ${jar} fehlt – bitte zuerst bauen:  cd mod/${dir} && gradlew build`);
+    console.error(`✗ ${jar} fehlt - bitte zuerst bauen:  cd mod/${dir} && gradlew build`);
     process.exit(1);
   }
   fs.mkdirSync(path.join(outDir, mc), { recursive: true });
   fs.copyFileSync(jar, path.join(outDir, mc, 'DeuCore.jar'));
-  manifest.divinecore[mc] = props.mod_version;
-  manifest.versions[mc] = [{ file: 'DeuCore.jar', id: 'divinecore', name: 'DeuCore', version: props.mod_version, core: true }];
-  console.log(`✓ DivineCore ${props.mod_version} für Minecraft ${mc}`);
+  manifest.deucore[mc] = props.mod_version;
+  manifest.versions[mc] = [{ file: 'DeuCore.jar', id: 'deucore', name: 'DeuCore', version: props.mod_version, core: true }];
+  console.log(`✓ DeuCore ${props.mod_version} für Minecraft ${mc}`);
 }
 
 // 2. Mitgelieferte Mods (resources/bundled-mods/<version>/*.jar)

@@ -7,6 +7,7 @@ import { NumberInput } from '../components/Controls';
 import { Icon, type IconName } from '../components/Icons';
 import { SkinHead } from '../components/SkinHead';
 import { useApp } from '../store';
+import { shortVersion } from '../version';
 
 function Section({ icon, title, children }: { icon: IconName; title: string; children: ReactNode }) {
   return (
@@ -39,7 +40,7 @@ export function Settings() {
   useEffect(() => {
     void api.app.systemInfo().then(setSys);
     void api.java.list().then(setJavas);
-    void api.app.divineCore().then(setCore);
+    void api.app.deuCore().then(setCore);
   }, []);
 
   if (!settings) return null;
@@ -60,7 +61,7 @@ export function Settings() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 pb-28">
+    <div className="mx-auto max-w-6xl space-y-6">
       <h2 className="font-display text-3xl font-black text-accent-gradient">{t('set.title')}</h2>
 
       <Section icon="cpu" title={t('set.game')}>
@@ -148,14 +149,21 @@ export function Settings() {
             ))}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-ink-200/60">{t('set.javaDownload')}:</span>
-          {[8, 17, 21, 25].map((m) => (
-            <button key={m} className="btn-ghost !px-3 !py-1.5 text-xs" disabled={downloading !== null} onClick={() => downloadJava(m)}>
-              <Icon name="download" size={12} className={downloading === m ? 'animate-bounce' : ''} /> Java {m}
-            </button>
-          ))}
-        </div>
+        {/* nur Versionen anbieten, die noch nicht installiert sind */}
+        {(() => {
+          const missing = [8, 17, 21, 25].filter((m) => !javas?.some((j) => j.major === m));
+          if (javas === null || !missing.length) return null;
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-ink-200/60">{t('set.javaDownload')}:</span>
+              {missing.map((m) => (
+                <button key={m} className="btn-ghost !px-3 !py-1.5 text-xs" disabled={downloading !== null} onClick={() => downloadJava(m)}>
+                  <Icon name="download" size={12} className={downloading === m ? 'animate-bounce' : ''} /> Java {m}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
       </Section>
 
       <Section icon="monitor" title={t('set.afterLaunch')}>
@@ -211,9 +219,6 @@ export function Settings() {
         <label className="flex items-center justify-between text-sm font-semibold">
           {t('set.animations')} <Toggle checked={settings.animations} onChange={(v) => updateSettings({ animations: v })} />
         </label>
-        <label className="flex items-center justify-between text-sm font-semibold">
-          {t('set.particles')} <Toggle checked={settings.particles} onChange={(v) => updateSettings({ particles: v })} />
-        </label>
         <div>
           <label className="label">{t('set.priority')}</label>
           <div className="grid grid-cols-2 gap-2">
@@ -251,7 +256,7 @@ export function Settings() {
         {accounts.accounts.length === 0 && <div className="text-sm text-ink-200/50">{t('account.none')}</div>}
         {accounts.accounts.map((a) => (
           <div key={a.uuid} className="flex items-center gap-3 rounded-xl border border-white/[0.06] bg-ink-950/40 px-4 py-3">
-            <SkinHead url={a.skinUrl} size={36} />
+            <SkinHead url={a.skinUrl} size={32} />
             <div className="min-w-0 flex-1">
               <div className="font-bold">{a.name}</div>
               <div className="truncate font-mono text-[11px] text-ink-200/45">{a.uuid}</div>
@@ -262,7 +267,7 @@ export function Settings() {
               <button className="btn-ghost !py-1.5 text-xs" onClick={async () => setAccounts(await api.accounts.select(a.uuid))}>{t('inst.select')}</button>
             )}
             <button className="btn-danger !py-1.5 text-xs" onClick={async () => setAccounts(await api.accounts.remove(a.uuid))}>
-              <Icon name="logout" size={13} /> {t('account.remove')}
+              {t('account.remove')}
             </button>
           </div>
         ))}
@@ -282,10 +287,10 @@ export function Settings() {
 
       <Section icon="sparkle" title={t('set.about')}>
         <div className="grid grid-cols-2 gap-3 text-sm">
-          <Info label="DeuClient" value={`v${sys?.appVersion ?? '1.0.0'}`} />
-          <Info label="DeuCore" value={core ? `v${core.version} · MC ${core.minecraft.join(', ')}` : '–'} />
-          <Info label="System" value={sys?.platform ?? '–'} />
-          <Info label="Daten" value={sys?.dataDir ?? '–'} mono />
+          <Info label="DeuClient" value={`v${shortVersion(sys?.appVersion ?? '1.0.0')}`} />
+          <Info label="DeuCore" value={core ? `v${core.version} · MC ${core.minecraft.join(', ')}` : '-'} />
+          <Info label="System" value={sys?.platform ?? '-'} />
+          <Info label="Daten" value={sys?.dataDir ?? '-'} mono />
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <button className="btn-ghost" disabled={update.state === 'checking' || update.state === 'downloading'} onClick={() => void api.update.check()}>

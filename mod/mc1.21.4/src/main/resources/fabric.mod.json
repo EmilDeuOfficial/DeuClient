@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "id": "divinecore",
+  "id": "deucore",
   "version": "${version}",
   "name": "DeuCore",
-  "description": "DeuClient-Look für Minecraft: eigener Ladebildschirm, Hauptmenü, Pause- und Multiplayer-Optik. Rein optisch – keine Cheats.",
+  "description": "DeuClient look for Minecraft: custom loading screen, main menu, pause and multiplayer visuals. Visual only - no cheats.",
   "authors": ["EmilDeuOfficial"],
   "license": "All-Rights-Reserved",
-  "icon": "assets/divinecore/icon.png",
+  "icon": "assets/deucore/icon.png",
   "environment": "client",
   "entrypoints": {
-    "client": ["eu.divinesmp.divinecore.DivineCore"]
+    "client": ["eu.deusmp.deucore.DeuCore"]
   },
-  "mixins": ["divinecore.mixins.json"],
+  "mixins": ["deucore.mixins.json"],
   "depends": {
     "fabricloader": ">=0.16.0",
     "minecraft": "${minecraft_version}",

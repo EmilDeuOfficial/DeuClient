@@ -1,6 +1,6 @@
 /**
  * Zentrale Pfade des Launchers.
- * Alle Daten liegen unter %APPDATA%\.deuclient – so bleibt die portable .exe sauber.
+ * Alle Daten liegen unter %APPDATA%\.deuclient - so bleibt die portable .exe sauber.
  */
 import { app } from 'electron';
 import path from 'node:path';
@@ -9,13 +9,13 @@ import fs from 'node:fs';
 /**
  * Echter Pfad des Datenordners. Läuft der Launcher in einer Umgebung, die %APPDATA% umleitet
  * (z. B. als MSIX-Paket gestarteter Elternprozess), sieht Java die Dateien unter dem umgeleiteten Pfad.
- * Stimmen Classpath und tatsächlicher Pfad nicht überein, lädt Fabric Mixin doppelt und das Spiel stürzt ab –
+ * Stimmen Classpath und tatsächlicher Pfad nicht überein, lädt Fabric Mixin doppelt und das Spiel stürzt ab -
  * daher wird der endgültige Pfad aufgelöst.
  */
 function resolveDataDir(): string {
   // DEUCLIENT_DATA_DIR: anderer Datenordner (für Tests / portable Nutzung)
   const dir = process.env.DEUCLIENT_DATA_DIR || path.join(app.getPath('appData'), '.deuclient');
-  // Migration: Datenordner des frueheren "Divine Launcher" uebernehmen (Accounts, Instanzen, Einstellungen)
+  // Migration: Datenordner des frueheren Launchers (.divinelauncher) uebernehmen (Accounts, Instanzen, Einstellungen)
   if (!process.env.DEUCLIENT_DATA_DIR && !fs.existsSync(dir)) {
     const legacy = path.join(app.getPath('appData'), '.divinelauncher');
     try {
@@ -49,13 +49,13 @@ export const paths = {
   accounts: path.join(DATA_DIR, 'accounts.json'),
 };
 
-/** Pfad zur eingebetteten DivineCore-Mod (im Build unter resources/mods, in der Entwicklung unter launcher/resources/mods) */
+/** Pfad zur eingebetteten DeuCore-Mod (im Build unter resources/mods, in der Entwicklung unter launcher/resources/mods) */
 export function bundledModsDir(): string {
   if (process.env.DEUCLIENT_BUNDLED_MODS) return process.env.DEUCLIENT_BUNDLED_MODS; // nur für Tests
   return app.isPackaged ? path.join(process.resourcesPath, 'mods') : path.join(app.getAppPath(), 'resources', 'mods');
 }
 
-/** Standard-Einstellungen fuer neue Modpacks (options.txt, Mod-Configs) – im Build unter resources/default-profile */
+/** Standard-Einstellungen fuer neue Modpacks (options.txt, Mod-Configs) - im Build unter resources/default-profile */
 export function defaultProfileDir(): string {
   return app.isPackaged ? path.join(process.resourcesPath, 'default-profile') : path.join(app.getAppPath(), 'resources', 'default-profile');
 }

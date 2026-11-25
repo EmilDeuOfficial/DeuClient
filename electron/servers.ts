@@ -142,7 +142,7 @@ export async function createServer(input: NewServerInput, onProgress: (t: string
     maxPlayers: input.maxPlayers,
     gamemode: input.gamemode,
     difficulty: input.difficulty,
-    motd: input.motd || `${input.name} – gehostet mit dem DeuClient`,
+    motd: input.motd || `${input.name} - gehostet mit dem DeuClient`,
     onlineMode: input.onlineMode,
     pvp: input.pvp,
     whitelist: false,
@@ -286,7 +286,7 @@ export async function addresses(id: string): Promise<{ local: string; lan: strin
   };
 }
 
-/** Port im Router freigeben (UPnP) – nur auf ausdrücklichen Wunsch des Nutzers */
+/** Port im Router freigeben (UPnP) - nur auf ausdrücklichen Wunsch des Nutzers */
 export async function enableUpnp(id: string): Promise<string> {
   const cfg = getServer(id);
   const ip = await openPort(cfg.port, `DeuClient Server ${cfg.name}`);

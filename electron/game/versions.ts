@@ -122,7 +122,7 @@ async function getFabricProfile(gameVersion: string, loaderVersion: string): Pro
   return JSON.parse(fs.readFileSync(file, 'utf8')) as VersionJson;
 }
 
-/** "group:artifact[:classifier]" – Schlüssel zum Entfernen doppelter Libraries */
+/** "group:artifact[:classifier]" - Schlüssel zum Entfernen doppelter Libraries */
 function libKey(name: string): string {
   const [group, artifact, , classifier] = name.split(':');
   return `${group}:${artifact}${classifier ? `:${classifier}` : ''}`;

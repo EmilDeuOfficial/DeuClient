@@ -70,11 +70,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [launching, setLaunching] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastId = useRef(0);
+  const downloadTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const toast = useCallback((text: string, kind: Toast['kind'] = 'info') => {
     const id = ++toastId.current;
-    setToasts((t) => [...t, { id, kind, text }]);
+    setToasts((t) => [...t, { id, kind, text }].slice(-3));
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 7000 : 3800);
   }, []);
 
@@ -100,8 +101,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }),
       onEvent('download:progress', (e) => {
+        clearTimeout(downloadTimer.current);
+        if (e.stage === 'idle') {
+          setDownload(null); // alles fertig: Leiste leise ausblenden
+          return;
+        }
         setDownload(e);
-        if (e.stage === 'done' || e.percent >= 1) setTimeout(() => setDownload(null), 1500);
+        // fertig: kurz anzeigen; sonst nach 8 s ohne neue Meldung ausblenden (damit nichts haengen bleibt)
+        downloadTimer.current = setTimeout(() => setDownload(null), 8000);
       }),
     ];
     return () => offs.forEach((f) => f());

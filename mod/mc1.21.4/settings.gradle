@@ -1,4 +1,4 @@
-// Gradle-Einstellungen für die DivineCore-Fabric-Mod
+// Gradle-Einstellungen für die DeuCore-Fabric-Mod
 pluginManagement {
     repositories {
         maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
@@ -6,4 +6,4 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-rootProject.name = 'divinecore'
+rootProject.name = 'deucore'

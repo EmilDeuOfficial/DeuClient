@@ -14,6 +14,7 @@ export function InstanceEditor({ open, instance, onClose }: { open: boolean; ins
   const [icon, setIcon] = useState('grass');
   const [mcVersion, setMcVersion] = useState('26.3');
   const [loader, setLoader] = useState<LoaderType>('fabric');
+  const [noDeu, setNoDeu] = useState(false);
   const [snapshots, setSnapshots] = useState(false);
   const [versions, setVersions] = useState<McVersion[]>([]);
   const [fabricVersions, setFabricVersions] = useState<Set<string>>(new Set());
@@ -25,6 +26,7 @@ export function InstanceEditor({ open, instance, onClose }: { open: boolean; ins
     setIcon(instance?.icon ?? 'grass');
     setMcVersion(instance?.mcVersion ?? '26.3');
     setLoader(instance?.loader ?? 'fabric');
+    setNoDeu(!!instance?.noDeu);
   }, [open, instance]);
 
   useEffect(() => {
@@ -42,8 +44,8 @@ export function InstanceEditor({ open, instance, onClose }: { open: boolean; ins
   const save = async () => {
     setSaving(true);
     try {
-      if (instance) await api.instances.update(instance.id, { name, icon, mcVersion, loader });
-      else await api.instances.create({ name, icon, mcVersion, loader });
+      if (instance) await api.instances.update(instance.id, { name, icon, mcVersion, loader, noDeu: loader === 'fabric' && noDeu });
+      else await api.instances.create({ name, icon, mcVersion, loader, noDeu: loader === 'fabric' && noDeu });
       toast(`${name || 'Instanz'} ✓`, 'success');
       onClose();
     } catch (e) {
@@ -90,6 +92,15 @@ export function InstanceEditor({ open, instance, onClose }: { open: boolean; ins
             ))}
           </div>
         </div>
+        {loader === 'fabric' && !instance?.isDefault && (
+          <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-white/10 px-4 py-3">
+            <div>
+              <div className="font-bold">DeuClient-Mods einbauen</div>
+              <div className="text-xs text-ink-200/60">DeuCore, HUD, Discord und Scout. Ausschalten für ein reines Mod-Modpack mit eigenen Mods.</div>
+            </div>
+            <Toggle checked={!noDeu} onChange={(v) => setNoDeu(!v)} />
+          </label>
+        )}
         <div>
           <div className="mb-1.5 flex items-center justify-between">
             <label className="label !mb-0">{t('inst.version')}</label>

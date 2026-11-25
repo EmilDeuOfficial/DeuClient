@@ -18,10 +18,9 @@ export const DEFAULT_SETTINGS: Settings = {
   language: 'de',
   showConsole: true,
   parallelDownloads: 12,
-  selectedInstance: 'divinesmp',
+  selectedInstance: 'deusmp',
   launchOnStartup: false,
   animations: true,
-  particles: true,
   gamePriority: 'normal',
 };
 

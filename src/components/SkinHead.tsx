@@ -16,9 +16,9 @@ export function SkinHead({ url, size = 32, className = '' }: { url?: string; siz
 
     // Platzhalter (Steve-ähnliche Farben), solange kein Skin geladen ist
     const placeholder = () => {
-      ctx.fillStyle = '#16a34a';
+      ctx.fillStyle = '#1fd35f';
       ctx.fillRect(0, 0, 8, 8);
-      ctx.fillStyle = '#22c55e';
+      ctx.fillStyle = '#2eff7a';
       ctx.fillRect(1, 3, 2, 1);
       ctx.fillRect(5, 3, 2, 1);
     };
@@ -39,7 +39,7 @@ export function SkinHead({ url, size = 32, className = '' }: { url?: string; siz
       ref={ref}
       width={8}
       height={8}
-      className={`rounded-md ${className}`}
+      className={`rounded-[3px] ${className}`}
       style={{ width: size, height: size, imageRendering: 'pixelated' }}
     />
   );

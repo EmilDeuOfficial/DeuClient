@@ -1,5 +1,5 @@
 {
-  "divinecore": {
+  "deucore": {
     "1.21.4": "1.0.0",
     "26.3": "1.4.0"
   },
@@ -7,7 +7,7 @@
     "1.21.4": [
       {
         "file": "DeuCore.jar",
-        "id": "divinecore",
+        "id": "deucore",
         "name": "DeuCore",
         "version": "1.0.0",
         "core": true
@@ -16,26 +16,10 @@
     "26.3": [
       {
         "file": "DeuCore.jar",
-        "id": "divinecore",
+        "id": "deucore",
         "name": "DeuCore",
         "version": "1.4.0",
         "core": true
-      },
-      {
-        "file": "DiscordGlass-1.0.0-mc26.3.jar",
-        "id": "discordglass",
-        "name": "Discord",
-        "version": "1.0.0",
-        "description": "Zeigt deinen Discord-Call, Mitglieder, Mute/Deafen und Benachrichtigungen ingame. Menü: Strg + Y",
-        "core": false
-      },
-      {
-        "file": "GlassScout-1.0.0-mc26.3.jar",
-        "id": "glassscout",
-        "name": "Scout",
-        "version": "1.0.0",
-        "description": "Zeigt beim /invsee sofort Kristalle, Totems, XP-Flaschen und die schwächste Rüstung des Gegners – direkt neben dem Inventar.",
-        "core": false
       }
     ]
   }

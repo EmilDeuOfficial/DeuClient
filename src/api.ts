@@ -1,5 +1,5 @@
 /**
- * Typisierte Brücke zur Preload-API (window.divine).
+ * Typisierte Brücke zur Preload-API (window.deu).
  * Jede Funktion entspricht einem IPC-Kanal im Main-Prozess (electron/main.ts).
  */
 import type {
@@ -10,17 +10,17 @@ import type {
 
 declare global {
   interface Window {
-    divine: {
+    deu: {
       invoke: (channel: string, ...args: unknown[]) => Promise<any>;
       on: (channel: string, cb: (payload: any) => void) => () => void;
     };
   }
 }
 
-const inv = <T>(channel: string, ...args: unknown[]): Promise<T> => window.divine.invoke(channel, ...args);
+const inv = <T>(channel: string, ...args: unknown[]): Promise<T> => window.deu.invoke(channel, ...args);
 
 export function onEvent<K extends keyof EventMap>(channel: K, cb: (payload: EventMap[K]) => void): () => void {
-  return window.divine.on(channel, cb);
+  return window.deu.on(channel, cb);
 }
 
 export const api = {
@@ -35,7 +35,7 @@ export const api = {
     openDataFolder: () => inv<void>('app:openDataFolder'),
     clearCache: () => inv<number>('app:clearCache'),
     openExternal: (url: string) => inv<void>('shell:openExternal', url),
-    divineCore: () => inv<{ version: string; minecraft: string[] } | null>('divinecore:info'),
+    deuCore: () => inv<{ version: string; minecraft: string[] } | null>('deucore:info'),
   },
   update: {
     status: () => inv<UpdateStatus>('update:status'),
@@ -115,7 +115,7 @@ export const api = {
   },
   capes: {
     list: () => inv<CustomCape[]>('capes:list'),
-    save: (name: string, png: string) => inv<CustomCape>('capes:save', name, png),
+    save: (name: string, png: string, id?: string) => inv<CustomCape>('capes:save', name, png, id),
     remove: (id: string) => inv<void>('capes:delete', id),
     equipped: () => inv<EquippedCosmetics>('capes:equipped'),
     equip: (sel: EquippedCosmetics) => inv<number>('capes:equip', sel),

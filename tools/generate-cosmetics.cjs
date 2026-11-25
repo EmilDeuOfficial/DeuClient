@@ -1,19 +1,35 @@
 /**
- * Erzeugt die Divine-Cosmetics als PNG für die DivineCore-Mod (26.3):
+ * Erzeugt die Deu-Cosmetics als PNG für die DeuCore-Mod (26.3):
  *   - Capes (HD-Cape-Format 256×128, vierfache Aufloesung des Minecraft-Formats 64×32, wird auch fuer die Elytra genutzt)
  *   - (Flügel: siehe generate-ingame-ui.cjs)
- *   - Logo-Glyph (16×16) für das Divine-Logo neben Spielernamen (eigene Schriftart)
+ *   - Logo-Glyph (16×16) für das Deu-Logo neben Spielernamen (eigene Schriftart)
  *
- * Alles wird per Code als SVG gebaut und mit resvg gerendert – keine fremden Grafiken.
+ * Alles wird per Code als SVG gebaut und mit resvg gerendert - keine fremden Grafiken.
  */
 const fs = require('node:fs');
 const path = require('node:path');
 const { Resvg } = require('@resvg/resvg-js');
 
-const assets = path.resolve(__dirname, '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'divinecore');
+const assets = path.resolve(__dirname, '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore');
 
 function pngSmooth(svg, width) {
   return new Resvg(svg, { fitTo: { mode: 'width', value: width }, shapeRendering: 2 }).render().asPng();
+}
+/** Schneidet ein PNG auf den sichtbaren Bereich zu (kein Leerraum, damit Icon und Text sauber sitzen) */
+function cropToAlpha(buf) {
+  const { PNG } = require('pngjs');
+  const src = PNG.sync.read(buf);
+  let x0 = src.width, x1 = -1, y0 = src.height, y1 = -1;
+  for (let y = 0; y < src.height; y++) {
+    for (let x = 0; x < src.width; x++) {
+      if (src.data[(y * src.width + x) * 4 + 3] > 0) {
+        x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
+      }
+    }
+  }
+  const out = new PNG({ width: x1 - x0 + 1, height: y1 - y0 + 1 });
+  PNG.bitblt(src, out, x0, y0, out.width, out.height, 0, 0);
+  return PNG.sync.write(out);
 }
 function png(svg, width) {
   return new Resvg(svg, { fitTo: { mode: 'width', value: width }, shapeRendering: 0 }).render().asPng();
@@ -133,7 +149,7 @@ const WINGS = {
 /** Ein Flügel: Wurzel links (x=0, y≈18), Spitze rechts oben, Federn hängen nach unten */
 function wingSvg(w) {
   let feathers = '';
-  // Schwungfedern (lang, unten) – von außen nach innen
+  // Schwungfedern (lang, unten) - von außen nach innen
   for (let i = 0; i < 7; i++) {
     const x = 58 - i * 8;
     const len = 46 - i * 4;
@@ -164,18 +180,28 @@ const LOGO_GLYPH = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="1
   <polygon points="8,5.8 10.2,8 8,10.2 5.8,8" fill="#fff6d6"/>
 </svg>`;
 
-console.log('Erzeuge Divine-Cosmetics ...');
+console.log('Erzeuge Deu-Cosmetics ...');
 const index = { capes: [], wings: [] };
 for (const [id, design] of Object.entries(CAPES)) {
-  write(`textures/cosmetics/cape/${id}.png`, pngSmooth(capeSvg(design), 256));
+  write(`textures/cosmetics/cape/${id}.png`, pngSmooth(capeSvg(design), 512));
+  // weich gefilterte Vorderseite fuer die Menues (160x256 - nahe an der Anzeigegroesse, kein Flimmern)
+  const front = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="16" viewBox="0 0 10 16"><defs>${grad('base', [[0, design.top], [1, design.bottom]])}</defs><rect width="10" height="16" fill="url(#base)"/>${design.art()}</svg>`;
+  write(`textures/cosmetics/ui/cape_${id}.png`, pngSmooth(front, 160));
   index.capes.push({ id, name: design.name });
 }
 // Flügel-Texturen erzeugt generate-ingame-ui.cjs (zweistufige Galaxie-Flügel)
 for (const [id, w] of Object.entries(WINGS)) index.wings.push({ id, name: w.name });
-write('textures/font/logo.png', png(LOGO_GLYPH, 16));
+// Namensicon = das neue DeuClient-Emblem (hochaufloesend, wird im Spiel auf Textgroesse skaliert)
+// nur der Smaragd: Kachel-Hintergrund, Rahmen und Schein werden entfernt, Ausschnitt auf den Stein
+const EMBLEM_SVG = fs
+  .readFileSync(path.resolve(__dirname, '..', 'img', 'emblem.svg'), 'utf8')
+  .replace(/<rect[^>]*rx="112"[^>]*\/>\s*/g, '')
+  .replace(/<circle cx="256" cy="240" r="230"[^>]*\/>\s*/, '')
+  .replace('viewBox="0 0 512 512"', 'viewBox="46 44 420 420"');
+write('textures/font/logo.png', cropToAlpha(pngSmooth(EMBLEM_SVG, 128)));
 write(
   'font/logo.json',
-  Buffer.from(JSON.stringify({ providers: [{ type: 'bitmap', file: 'divinecore:font/logo.png', ascent: 8, height: 9, chars: [''] }] }, null, 2)),
+  Buffer.from(JSON.stringify({ providers: [{ type: 'bitmap', file: 'deucore:font/logo.png', ascent: 8, height: 8, chars: [''] }, { type: 'space', advances: { ' ': 1 } }] }, null, 2)),
 );
 write('cosmetics.json', Buffer.from(JSON.stringify(index, null, 2)));
 console.log('Fertig.');

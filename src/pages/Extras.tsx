@@ -7,6 +7,7 @@ import type { ModrinthProject } from '../../shared/types';
 import { api } from '../api';
 import { formatNumber, ModIcon } from '../components/Common';
 import { Select } from '../components/Controls';
+import { InstanceIcon } from '../components/InstanceIcon';
 import { Icon, type IconName } from '../components/Icons';
 import { useApp } from '../store';
 import type { TKey } from '../i18n';
@@ -74,7 +75,7 @@ export function Extras() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-28">
+    <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-end justify-between gap-6">
         <div>
           <h2 className="font-display text-3xl font-black text-accent-gradient">{t('extras.title')}</h2>
@@ -83,13 +84,9 @@ export function Extras() {
         {target && (
           <label className="flex shrink-0 items-center gap-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-ink-200/60">{t('extras.target')}</span>
-            <Select className="!w-60" value={target.id} onChange={setTargetId} options={fabricPacks.map((i) => ({ value: i.id, label: i.name, sub: i.mcVersion }))} />
+            <Select className="!w-60" value={target.id} onChange={setTargetId} options={fabricPacks.map((i) => ({ value: i.id, label: i.name, sub: i.mcVersion, icon: <InstanceIcon icon={i.icon} size={26} /> }))} />
           </label>
         )}
-      </div>
-
-      <div className="flex items-center gap-3 rounded-xl border border-emerald-400/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
-        <Icon name="check" size={16} /> {t('extras.fair')}
       </div>
 
       {!target && <div className="card p-8 text-center text-ink-200/60">{t('extras.needsFabric')}</div>}
@@ -109,7 +106,7 @@ export function Extras() {
                 </div>
               </div>
               <button className="btn-accent" disabled={!missing.length || busy !== null} onClick={() => install(missing)}>
-                <Icon name="download" size={15} /> {t('extras.installAll')} {missing.length ? `(${missing.length})` : ''}
+                <Icon name={missing.length ? 'download' : 'check'} size={15} /> {missing.length ? `${t('extras.installAll')} (${missing.length})` : t('extras.allInstalled')}
               </button>
             </div>
             <div className="grid grid-cols-2 gap-px bg-white/[0.04] xl:grid-cols-3">

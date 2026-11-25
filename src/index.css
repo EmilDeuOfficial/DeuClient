@@ -64,7 +64,7 @@ body,
     @apply rounded-2xl border border-white/[0.07] bg-ink-850;
   }
   .card-hover {
-    @apply transition-colors duration-150 hover:border-white/20;
+    @apply transition duration-200 hover:-translate-y-0.5 hover:border-white/20;
   }
 
   .text-accent-gradient {
@@ -72,11 +72,11 @@ body,
   }
 
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-colors duration-150
-      disabled:pointer-events-none disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition duration-150
+      active:scale-[0.98] disabled:pointer-events-none disabled:opacity-40;
   }
   .btn-accent {
-    @apply btn bg-accent-500 text-ink-950 hover:bg-accent-400;
+    @apply btn bg-accent-400 text-ink-950 hover:bg-accent-300;
   }
   .btn-alt {
     @apply btn bg-ink-600 text-white hover:bg-ink-500;
@@ -120,7 +120,7 @@ input[type='range'].deu-range {
   appearance: none;
   height: 6px;
   border-radius: 999px;
-  background: linear-gradient(90deg, #22c55e var(--fill, 50%), rgba(255, 255, 255, 0.1) var(--fill, 50%));
+  background: linear-gradient(90deg, #2eff7a var(--fill, 50%), rgba(255, 255, 255, 0.1) var(--fill, 50%));
   outline: none;
 }
 input[type='range'].deu-range::-webkit-slider-thumb {
@@ -128,7 +128,7 @@ input[type='range'].deu-range::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #f0fdf4;
+  background: #f0fff6;
   border: 0;
   cursor: pointer;
 }
@@ -152,9 +152,19 @@ input[type='range'].deu-range::-webkit-slider-thumb {
   transition-duration: 0.001ms !important;
 }
 
-/* Seitenwechsel: ohne Animation */
+/* Seitenwechsel: kurzes, ruhiges Einblenden */
 .page-enter {
-  animation: none;
+  animation: pageIn 0.22s ease-out both;
+}
+@keyframes pageIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Markdown aus Modrinth-Beschreibungen */

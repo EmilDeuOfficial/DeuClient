@@ -11,15 +11,17 @@ const GLYPHS: Record<string, Glyph> = {
   grass: ({ id }) => (
     <>
       <defs>
-        <linearGradient id={id('top')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#86efac" /><stop offset="1" stopColor="#22c55e" /></linearGradient>
+        <linearGradient id={id('top')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#9fffc0" /><stop offset="1" stopColor="#2eff7a" /></linearGradient>
         <linearGradient id={id('l')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#9a6a3a" /><stop offset="1" stopColor="#6b4423" /></linearGradient>
         <linearGradient id={id('r')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7a4f29" /><stop offset="1" stopColor="#4d3019" /></linearGradient>
       </defs>
+      <g transform="translate(0 -2.5)">
       <polygon points="9,17.5 24,26 24,40 9,31.5" fill={`url(#${id('l')})`} />
       <polygon points="39,17.5 24,26 24,40 39,31.5" fill={`url(#${id('r')})`} />
       <path d="M9 17.5 24 26v4.2c-2-.2-2.6-2-4.4-1.6-1.8.4-1.6 2.2-3.6 2.2s-2.2-2.2-4.2-2c-1.6.2-1.8 1.8-2.8 1.4V17.5z" fill="#2fa84f" />
       <path d="M39 17.5 24 26v4.2c2-.2 2.8-1.8 4.6-1.4 1.6.4 1.8 2 3.6 2 2 0 2.2-2.6 4.2-2.4.8.1 1.6.7 2.6.4V17.5z" fill="#238a40" />
       <polygon points="24,9 39,17.5 24,26 9,17.5" fill={`url(#${id('top')})`} />
+      </g>
     </>
   ),
   diamond: () => (
@@ -40,9 +42,9 @@ const GLYPHS: Record<string, Glyph> = {
       <g transform="rotate(45 24 24)">
         <polygon points="21,5 24,1.5 27,5 27,29 21,29" fill={`url(#${id('blade')})`} />
         <line x1="24" y1="5" x2="24" y2="29" stroke="#64748b" strokeWidth="0.8" strokeOpacity=".6" />
-        <rect x="14.5" y="29" width="19" height="4.2" rx="2.1" fill="#22c55e" />
+        <rect x="14.5" y="29" width="19" height="4.2" rx="2.1" fill="#2eff7a" />
         <rect x="21.8" y="33" width="4.4" height="9" rx="2" fill="#8a5a2b" />
-        <circle cx="24" cy="44.5" r="2.7" fill="#4ade80" />
+        <circle cx="24" cy="44.5" r="2.7" fill="#6bff9e" />
       </g>
     </>
   ),
@@ -91,23 +93,25 @@ const GLYPHS: Record<string, Glyph> = {
   package: ({ id }) => (
     <>
       <defs>
-        <linearGradient id={id('t')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#bbf7d0" /><stop offset="1" stopColor="#4ade80" /></linearGradient>
-        <linearGradient id={id('l')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#22c55e" /><stop offset="1" stopColor="#15803d" /></linearGradient>
-        <linearGradient id={id('r')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#16a34a" /><stop offset="1" stopColor="#14532d" /></linearGradient>
+        <linearGradient id={id('t')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#d4ffe4" /><stop offset="1" stopColor="#6bff9e" /></linearGradient>
+        <linearGradient id={id('l')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2eff7a" /><stop offset="1" stopColor="#17a84a" /></linearGradient>
+        <linearGradient id={id('r')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1fd35f" /><stop offset="1" stopColor="#0f7a35" /></linearGradient>
       </defs>
+      <g transform="translate(0 -1.5)">
       <polygon points="9,17 24,25 24,41 9,33" fill={`url(#${id('l')})`} />
       <polygon points="39,17 24,25 24,41 39,33" fill={`url(#${id('r')})`} />
       <polygon points="24,9 39,17 24,25 9,17" fill={`url(#${id('t')})`} />
-      <polygon points="18.500,12 33.500,20 29.500,22.200 14.500,14.200" fill="#f0fdf4" fillOpacity=".75" />
+      <polygon points="18.500,12 33.500,20 29.500,22.200 14.500,14.200" fill="#f0fff6" fillOpacity=".75" />
+      </g>
     </>
   ),
 };
 
-export const ICON_KEYS = ['divine', ...Object.keys(GLYPHS)];
+export const ICON_KEYS = ['deu', ...Object.keys(GLYPHS)];
 
 export function InstanceIcon({ icon, size = 48, className = '' }: { icon: string; size?: number; className?: string }) {
   const uid = useId().replace(/:/g, '');
-  if (icon === 'divine' || !GLYPHS[icon]) {
+  if (icon === 'deu' || !GLYPHS[icon]) {
     return <img src={emblem} alt="" style={{ width: size, height: size }} className={className} draggable={false} />;
   }
   const id = (name: string) => `ic${uid}${name}`;

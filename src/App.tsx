@@ -1,8 +1,9 @@
 /** Hauptlayout: Titelleiste, Seitenleiste, Kopfzeile mit Account, animierte Seiten, Fortschrittsleiste. */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AccountMenu } from './components/AccountMenu';
 import { Background } from './components/Background';
 import { LaunchBar, Toasts } from './components/Common';
+import { ConfirmHost } from './components/Confirm';
 import { Sidebar } from './components/Sidebar';
 import { Splash } from './components/Splash';
 import { TitleBar } from './components/TitleBar';
@@ -13,9 +14,14 @@ import { Shop } from './pages/Shop';
 import { Modpacks } from './pages/Modpacks';
 import { Settings } from './pages/Settings';
 import { AppProvider, useApp } from './store';
+import { setTranslateLanguage } from './autotranslate';
 
 function Shell() {
-  const { page, packId, t, reloadInstances } = useApp();
+  const { page, packId, t, reloadInstances, progress, download, settings } = useApp();
+
+  // Texte mit fest im Code stehendem Deutsch (Shop, Server ...) bei Sprache Englisch uebersetzen
+  const language = settings?.language ?? 'de';
+  useEffect(() => setTranslateLanguage(language), [language]);
   const [booted, setBooted] = useState(false);
   const onSplashDone = useCallback(() => {
     setBooted(true);
@@ -31,14 +37,16 @@ function Shell() {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="relative flex min-w-0 flex-1 flex-col">
-          <div className="flex h-[68px] shrink-0 items-center justify-between px-8">
+          <div className="flex h-[68px] shrink-0 items-center px-8">
+            <div className="mx-auto flex w-full max-w-6xl items-center justify-between">
             <div className="flex items-center gap-3">
               <span className="h-5 w-1 rounded-full bg-accent-400" />
               <span className="font-display text-sm font-bold uppercase tracking-[0.3em] text-ink-100/80">{titles[page]}</span>
             </div>
             <AccountMenu />
+            </div>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto px-8 pt-2">
+          <div className="min-h-0 flex-1 overflow-y-auto pb-8 pl-8 pr-[22px] pt-2 [scrollbar-gutter:stable]">
             {/* key = page → Animation bei jedem Seitenwechsel */}
             <div key={`${page}-${packId ?? ''}`} className="page-enter">
               {page === 'home' && <Home />}
@@ -48,11 +56,13 @@ function Shell() {
               {page === 'extras' && <Extras />}
               {page === 'settings' && <Settings />}
             </div>
+            {(progress || download) && <div className="h-20" />}
           </div>
           <LaunchBar />
         </main>
       </div>
       <Toasts />
+      <ConfirmHost />
       {!booted && <Splash onDone={onSplashDone} />}
     </div>
   );

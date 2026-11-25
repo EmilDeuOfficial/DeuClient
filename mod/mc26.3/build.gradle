@@ -1,4 +1,4 @@
-// DivineCore 26.3 – rein optische Fabric-Mod + Divine-Menü (Rechts-Shift) für DeuClient
+// DeuCore 26.3 - rein optische Fabric-Mod + Deu-Menü (Rechts-Shift) für DeuClient
 plugins {
     id 'net.fabricmc.fabric-loom' version "${loom_version}"
 }
@@ -11,7 +11,7 @@ base {
 }
 
 dependencies {
-    // Ab 26.x ist Minecraft unobfuskiert – keine Mappings nötig
+    // Ab 26.x ist Minecraft unobfuskiert - keine Mappings nötig
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"

@@ -1,5 +1,5 @@
 /**
- * Renders the in-game logo assets of the DivineCore mods from img/:
+ * Renders the in-game logo assets of the DeuCore mods from img/:
  *   - gui/emblem.png      emblem (img/emblem.svg), 256x256
  *   - gui/wordmark.png    DeuClient logo (img/logo.png), 1024 px wide, used for loading screen and main menu
  *   - icon.png, icon/icon_32.png, icon/icon_64.png   window and mod icons
@@ -28,7 +28,7 @@ const logoH = logoPng.readUInt32BE(20);
 const wordmark = scalePng(logoPng, logoW, logoH, 1024);
 
 for (const v of fs.readdirSync(path.join(root, 'mod')).filter((d) => d.startsWith('mc'))) {
-  const assets = path.join(root, 'mod', v, 'src', 'main', 'resources', 'assets', 'divinecore');
+  const assets = path.join(root, 'mod', v, 'src', 'main', 'resources', 'assets', 'deucore');
   const write = (rel, buf) => {
     const f = path.join(assets, rel);
     fs.mkdirSync(path.dirname(f), { recursive: true });

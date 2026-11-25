@@ -20,7 +20,7 @@ let cached: Gateway | null = null;
 
 /**
  * Lokale IPv4-Adresse der Netzwerkkarte, über die dieser PC ins Internet geht.
- * Ein UDP-"connect" legt nur die Route fest – es werden dabei keine Daten gesendet.
+ * Ein UDP-"connect" legt nur die Route fest - es werden dabei keine Daten gesendet.
  * So landet man nicht bei virtuellen Adaptern (VirtualBox, Hyper-V, VPN …).
  */
 export function lanAddress(): Promise<string | null> {

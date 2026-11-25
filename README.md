@@ -1,6 +1,6 @@
 # DeuClient
 
-![Version](https://img.shields.io/badge/version-v1.4.0-22C55E)
+![Version](https://img.shields.io/badge/version-v1.0-2EFF7A)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-1C1C1C)
 ![Language](https://img.shields.io/badge/language-TypeScript-1C1C1C)
 ![License](https://img.shields.io/badge/license-proprietary-22C55E)
@@ -25,7 +25,7 @@ DeuClient is a Minecraft launcher for Windows with its own Fabric client mod. It
 - Setup installer (NSIS) with selectable install folder, desktop and Start menu shortcuts
 - German and English user interface
 
-### DeuCore (Fabric client mod in `mod/`, internal name DivineCore)
+### DeuCore (Fabric client mod in `mod/`)
 
 - Visual client only, no cheats
 - Green and black design, main menu and loading screen with the DeuClient logo, mod menu on Right Shift (favorites, search, categories)
@@ -98,7 +98,7 @@ For automatic tests, developers only:
 - `DEUCLIENT_DATA_DIR` uses another data folder
 - `DEUCLIENT_DRY_RUN=1` prepares a launch without starting Java
 - `DEUCLIENT_SCREENSHOT=<file.png>` saves a screenshot of the interface and exits
-- Mod: JVM argument `-Ddivinecore.demo=true` opens menus one after another and saves screenshots
+- Mod: JVM argument `-Ddeucore.demo=true` opens menus one after another and saves screenshots
 
 ## File Structure
 
@@ -136,7 +136,7 @@ DeuClient/
 ├── electron/               Main process
 │   ├── tsconfig.json       Main process and preload
 │   ├── main.ts             Window, IPC, console window
-│   ├── preload.ts          Safe bridge to the interface (window.divine)
+│   ├── preload.ts          Safe bridge to the interface (window.deu)
 │   ├── auth/               Microsoft, Xbox, XSTS and Minecraft login, account storage
 │   ├── game/               Versions, Fabric, Java, launch, instances, mod sync
 │   ├── modrinth.ts         Modrinth API v2 (search, install, updates, .mrpack)
@@ -144,7 +144,7 @@ DeuClient/
 │   ├── upnp.ts             Port forwarding
 │   ├── capes.ts            Cape and wings selection, own capes
 │   ├── settings.ts
-│   └── util/               Downloads (parallel, SHA1), paths, storage
+│   └── util/               Downloads (parallel, SHA1), paths, storage, migration of data from before the rename
 ├── src/                    Interface (React)
 │   ├── main.tsx            Entry
 │   ├── App.tsx             Layout and pages
@@ -155,7 +155,7 @@ DeuClient/
 │   ├── index.css           Base style and components
 │   ├── components/         Splash, title bar, sidebar, background, shared widgets
 │   └── pages/              Home, Modpacks, Instances, Servers, Shop, Extras, Settings
-└── mod/                    DeuCore Fabric mod (internal name DivineCore)
+└── mod/                    DeuCore Fabric mod
     ├── mc26.3/             Minecraft 26.3 (unobfuscated, Mojang names, Java 25)
     └── mc1.21.4/           Minecraft 1.21.4 (Yarn mappings, Java 21)
 ```
@@ -170,7 +170,7 @@ Everything the launcher stores is under `%APPDATA%\.deuclient`:
 - `settings.json`: settings
 - `accounts.json`: accounts (tokens encrypted)
 
-An existing `%APPDATA%\.divinelauncher` folder from the earlier Divine Launcher is moved to `.deuclient` on the first start.
+An existing `%APPDATA%\.divinelauncher` folder from the earlier launcher is moved to `.deuclient` on the first start. Modpack data, settings and mod configs stored under the names from before the rename to Deu are migrated automatically on the first start (`electron/util/migrate.ts`, nothing is overwritten).
 
 ## Releases and automatic updates
 
@@ -186,19 +186,20 @@ Updates only work in the installed version, not in development.
 
 ## Changelog
 
-### v1.4.0
+### v1.0
 
-- Launcher renamed from Divine Launcher to DeuClient
+- Everything now uses the name Deu: mod id, packages, files, bridge, config and channel names; existing modpacks, settings and mod configs are migrated automatically on the first start
+- Launcher renamed to DeuClient
 - New design: black with a green accent
 - Repository restructured: launcher at the root, `img/` for branding, `tools/` for build scripts
-- Shop: HD capes, no more Divine/DeuClient capes, wings fit completely, own color picker, no hover movement
+- Shop: HD capes, no more built-in DeuClient capes, wings fit completely, own color picker, no hover movement
 - Extras: More Culling, BadOptimizations, ModernFix, Packet Fixer, C2ME, Model Gap Fix, Chat Heads, REI, Controlling, Reese's Sodium Options, Sodium Extra, Simple Voice Chat, Xaero's World Map, Full Brightness Toggle
 - Settings: start with Windows, animations and particles on/off, game priority, JVM profiles, clear cache and logs
 - DeuCore: GUI scale 2.5 (default) in the mod menu; new modpacks start with music at 0% and without the welcome screen
 - Automatic updates from GitHub releases; the license is now proprietary (all rights reserved)
 - Navigation: "Extras" is now "Recommended", new icons for Shop and Recommended
 - Launcher design is flatter: no gradients, glow effects, background scene or decorative animations
-- DivineBridge server plugin removed completely
+- Bridge server plugin removed completely
 - Launcher: own dropdowns, checkboxes and number fields instead of the Windows controls, vector modpack icons, nothing is cut off at small window sizes
 - The mod is now called DeuCore and includes the HUD; Spotify is removed, modules are called Discord and Scout
 - Repository tidied: build script in `tools/`, TypeScript config of the main process in `electron/`, PostCSS inlined into the Vite config, bundled mods in `resources/`
@@ -207,7 +208,7 @@ Updates only work in the installed version, not in development.
 - The console window closes when Minecraft exits normally and stays open after a crash
 - Setup installer is now `DeuClient-Setup.exe` in `release\`
 - Data folder is now `%APPDATA%\.deuclient`, the old folder is migrated automatically
-- Environment variables for tests renamed from `DIVINE_*` to `DEUCLIENT_*`
+- Environment variables for tests now start with `DEUCLIENT_`
 
 ## License
 

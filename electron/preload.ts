@@ -1,10 +1,10 @@
 /**
- * Preload-Script: stellt der Oberfläche eine schmale, sichere API (window.divine) bereit.
- * Die Oberfläche hat keinen Node-Zugriff – alles läuft über diese IPC-Brücke.
+ * Preload-Script: stellt der Oberfläche eine schmale, sichere API (window.deu) bereit.
+ * Die Oberfläche hat keinen Node-Zugriff - alles läuft über diese IPC-Brücke.
  */
 import { contextBridge, ipcRenderer } from 'electron';
 
-contextBridge.exposeInMainWorld('divine', {
+contextBridge.exposeInMainWorld('deu', {
   /** Ruft einen IPC-Handler im Main-Prozess auf und entpackt { ok, data | error } */
   invoke: async (channel: string, ...args: unknown[]) => {
     const res = (await ipcRenderer.invoke(channel, ...args)) as { ok: boolean; data?: unknown; error?: string };

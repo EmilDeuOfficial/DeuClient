@@ -1,6 +1,7 @@
 /** Seitenleiste mit Navigation: Home, Instanzen, Mods, Einstellungen. */
 import { useApp, type Page } from '../store';
 import { api } from '../api';
+import { APP_VERSION } from '../version';
 import { Icon, type IconName } from './Icons';
 
 const ITEMS: { page: Page; icon: IconName; key: 'nav.home' | 'nav.modpacks' | 'nav.servers' | 'nav.shop' | 'nav.extras' | 'nav.settings' }[] = [
@@ -70,7 +71,7 @@ export function Sidebar() {
             {t('update.install')} {update.version}
           </button>
         )}
-        <div className="text-center text-[10px] tracking-wider text-ink-200/35">DeuClient v1.4.0</div>
+        <div className="text-center text-[10px] tracking-wider text-ink-200/35">DeuClient v{APP_VERSION}</div>
       </div>
     </nav>
   );

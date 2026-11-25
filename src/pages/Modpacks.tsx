@@ -1,11 +1,12 @@
 /**
  * Modpacks: Übersicht aller Modpacks und Detailansicht eines Modpacks.
- * Mods, Resourcepacks und Shader werden ausschließlich hier – innerhalb eines Modpacks – hinzugefügt.
+ * Mods, Resourcepacks und Shader werden ausschließlich hier - innerhalb eines Modpacks - hinzugefügt.
  */
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { Instance, InstanceStats, ScreenshotInfo, WorldInfo } from '../../shared/types';
 import { api } from '../api';
 import { Toggle } from '../components/Common';
+import { confirmDialog } from '../components/Confirm';
 import { ContentManager } from '../components/Content';
 import { Icon, type IconName } from '../components/Icons';
 import { InstanceIcon } from '../components/InstanceIcon';
@@ -32,7 +33,7 @@ function ModpackList() {
   const { t, instances, selectedInstance, openPack, launch, launching, game, accounts, toast } = useApp();
   const [editing, setEditing] = useState(false);
   const [core, setCore] = useState<string[]>([]);
-  useEffect(() => void api.app.divineCore().then((i) => setCore(i?.minecraft ?? [])), []);
+  useEffect(() => void api.app.deuCore().then((i) => setCore(i?.minecraft ?? [])), []);
 
   const importPack = async () => {
     try {
@@ -47,7 +48,7 @@ function ModpackList() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl pb-28">
+    <div className="mx-auto max-w-6xl">
       <div className="mb-6 flex items-end justify-between gap-6">
         <div>
           <h2 className="font-display text-3xl font-black text-accent-gradient">{t('pack.title')}</h2>
@@ -153,7 +154,7 @@ function ModpackDetail({ inst }: { inst: Instance }) {
   const play = () => (accounts.activeUuid ? launch(inst.id) : toast(t('home.loginFirst'), 'error'));
 
   return (
-    <div className="mx-auto max-w-6xl pb-28">
+    <div className="mx-auto max-w-6xl">
       <button className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-ink-200/70 transition hover:text-accent-200" onClick={() => openPack(null)}>
         <Icon name="chevronRight" size={14} className="rotate-180" /> {t('pack.back')}
       </button>
@@ -243,20 +244,20 @@ function Overview({ inst, onTab }: { inst: Instance; onTab: (t: Tab) => void }) 
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-3 gap-4 xl:grid-cols-6">
-        <StatCard icon="puzzle" label={t('mods.mods')} value={stats?.mods ?? '–'} onClick={() => onTab('mod')} />
-        <StatCard icon="image" label={t('mods.resourcepacks')} value={stats?.resourcepacks ?? '–'} onClick={() => onTab('resourcepack')} />
-        <StatCard icon="sun" label={t('mods.shaders')} value={stats?.shaders ?? '–'} onClick={() => onTab('shader')} />
-        <StatCard icon="globe" label={t('pack.worlds')} value={stats?.worlds ?? '–'} onClick={() => onTab('worlds')} />
-        <StatCard icon="image" label={t('pack.screenshots')} value={stats?.screenshots ?? '–'} onClick={() => onTab('screenshots')} />
-        <StatCard icon="package" label={t('pack.size')} value={stats ? `${stats.sizeMb} MB` : '–'} />
+        <StatCard icon="puzzle" label={t('mods.mods')} value={stats?.mods ?? '-'} onClick={() => onTab('mod')} />
+        <StatCard icon="image" label={t('mods.resourcepacks')} value={stats?.resourcepacks ?? '-'} onClick={() => onTab('resourcepack')} />
+        <StatCard icon="sun" label={t('mods.shaders')} value={stats?.shaders ?? '-'} onClick={() => onTab('shader')} />
+        <StatCard icon="globe" label={t('pack.worlds')} value={stats?.worlds ?? '-'} onClick={() => onTab('worlds')} />
+        <StatCard icon="image" label={t('pack.screenshots')} value={stats?.screenshots ?? '-'} onClick={() => onTab('screenshots')} />
+        <StatCard icon="package" label={t('pack.size')} value={stats ? `${stats.sizeMb} MB` : '-'} />
       </div>
 
       {managed.length > 0 && (
         <section className="card overflow-hidden">
           <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-4">
             <div>
-              <div className="font-display font-bold text-accent-200">{t('pack.divineMods')}</div>
-              <div className="text-xs text-ink-200/60">{t('pack.divineModsHint')}</div>
+              <div className="font-display font-bold text-accent-200">{t('pack.deuMods')}</div>
+              <div className="text-xs text-ink-200/60">{t('pack.deuModsHint')}</div>
             </div>
             <span className="badge shrink-0 bg-accent-400/15 text-accent-200">Rechts-Shift</span>
           </div>
@@ -360,7 +361,7 @@ function PackSettings({ inst, onEdit }: { inst: Instance; onEdit: () => void }) 
   }, [inst.id]);
 
   const remove = async () => {
-    if (!confirm(t('inst.confirmDelete'))) return;
+    if (!(await confirmDialog(t('inst.confirmDelete'), { danger: true, confirmLabel: t('inst.delete') }))) return;
     try {
       await api.instances.remove(inst.id);
       openPack(null);

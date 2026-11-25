@@ -1,6 +1,6 @@
 # ============================================================
 #  DeuClient - full build (run: tools/build.ps1)
-#  1. Build the DivineCore mods (1.21.4 and 26.3, Gradle)
+#  1. Build the DeuCore mods (1.21.4 and 26.3, Gradle)
 #  2. Build the launcher (icons, embed mods, Electron, installer)
 #  Result: release\DeuClient-Setup.exe
 # ============================================================
@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
 foreach ($mod in Get-ChildItem "$root\mod" -Directory -Filter 'mc*') {
-    Write-Host "`nBuilding DivineCore ($($mod.Name)) ..." -ForegroundColor Green
+    Write-Host "`nBuilding DeuCore ($($mod.Name)) ..." -ForegroundColor Green
     Push-Location $mod.FullName
     .\gradlew.bat build --no-daemon
     if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Mod build $($mod.Name) failed" }

@@ -5,7 +5,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NewServerInput, ServerAddresses, ServerConfig, ServerRuntime } from '../../shared/types';
 import { api, onEvent } from '../api';
+import { tx } from '../autotranslate';
 import { Modal, Toggle } from '../components/Common';
+import { confirmDialog } from '../components/Confirm';
 import { Checkbox, NumberInput, Select } from '../components/Controls';
 import { Icon } from '../components/Icons';
 import { useApp } from '../store';
@@ -41,12 +43,12 @@ export function Servers() {
   const current = servers.find((s) => s.id === selected);
 
   return (
-    <div className="mx-auto max-w-6xl pb-28">
+    <div className="mx-auto max-w-6xl">
       <div className="mb-6 flex items-end justify-between gap-6">
         <div>
           <h2 className="font-display text-3xl font-black text-accent-gradient">Deine Server</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-200/60">
-            Erstelle einen eigenen Minecraft-Server, der direkt auf deinem PC läuft – mit IP für dich, dein Heimnetz und (per Portfreigabe) deine Freunde.
+            Erstelle einen eigenen Minecraft-Server, der direkt auf deinem PC läuft - mit IP für dich, dein Heimnetz und (per Portfreigabe) deine Freunde.
           </p>
         </div>
         <button className="btn-accent shrink-0" onClick={() => setCreating(true)}>
@@ -175,8 +177,10 @@ function ServerDetail({ server, rt, onChanged }: { server: ServerConfig; rt?: Se
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h3 className="truncate font-display text-2xl font-black">{server.name}</h3>
-              <StatusDot rt={rt} />
-              <span className="text-xs font-semibold text-ink-200/70">{rt?.online ? 'Online' : running ? 'Startet ...' : 'Gestoppt'}</span>
+              <span className="inline-flex shrink-0 items-center gap-2 rounded-full bg-white/[0.06] px-3 py-1 text-xs font-semibold text-ink-100">
+                <StatusDot rt={rt} />
+                {rt?.online ? 'Online' : running ? 'Startet ...' : 'Gestoppt'}
+              </span>
             </div>
             <div className="mt-1 flex flex-wrap gap-1.5 text-xs">
               <span className="badge bg-white/10 text-ink-100">{server.type === 'paper' ? 'Paper' : 'Vanilla'} {server.mcVersion}</span>
@@ -219,9 +223,9 @@ function ServerDetail({ server, rt, onChanged }: { server: ServerConfig; rt?: Se
                   <button
                     className="btn-ghost !py-1.5 text-xs"
                     disabled={busy}
-                    onClick={() => {
-                      if (!confirm(`Port ${server.port} jetzt per UPnP in deinem Router freigeben?\n\nDanach ist dein Server aus dem Internet erreichbar. Teile die IP nur mit Leuten, denen du vertraust.`)) return;
-                      void run(() => api.servers.upnpOn(server.id), 'Port freigegeben – deine öffentliche IP steht jetzt oben');
+                    onClick={async () => {
+                      if (!(await confirmDialog(tx(`Port ${server.port} jetzt per UPnP in deinem Router freigeben?\n\nDanach ist dein Server aus dem Internet erreichbar. Teile die IP nur mit Leuten, denen du vertraust.`), { confirmLabel: tx('Freigeben') }))) return;
+                      void run(() => api.servers.upnpOn(server.id), 'Port freigegeben - deine öffentliche IP steht jetzt oben');
                     }}
                   >
                     <Icon name="globe" size={12} /> Port freigeben (UPnP)
@@ -251,7 +255,9 @@ function ServerDetail({ server, rt, onChanged }: { server: ServerConfig; rt?: Se
             <button
               className="btn-danger !py-1.5 text-xs"
               disabled={running}
-              onClick={() => confirm(`Server "${server.name}" samt Welt wirklich löschen?`) && run(() => api.servers.remove(server.id), 'Server gelöscht')}
+              onClick={async () => {
+                if (await confirmDialog(tx(`Server "${server.name}" samt Welt wirklich löschen?`), { danger: true, confirmLabel: tx('Löschen') })) void run(() => api.servers.remove(server.id), 'Server gelöscht');
+              }}
             >
               <Icon name="trash" size={12} /> Löschen
             </button>
@@ -383,7 +389,7 @@ function CreateServer({ open, progress, onClose, onCreated }: { open: boolean; p
         </div>
         <div>
           <label className="label">Beschreibung (MOTD)</label>
-          <input className="input" placeholder={`${form.name} – gehostet mit dem DeuClient`} value={form.motd} onChange={(e) => set('motd', e.target.value)} />
+          <input className="input" placeholder={`${form.name} - gehostet mit dem DeuClient`} value={form.motd} onChange={(e) => set('motd', e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-3 text-sm">
           <label className="flex items-center justify-between rounded-xl border border-white/[0.06] bg-ink-950/40 px-3 py-2">PvP <Toggle checked={form.pvp} onChange={(v) => set('pvp', v)} /></label>

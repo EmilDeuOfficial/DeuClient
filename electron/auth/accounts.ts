@@ -7,6 +7,7 @@ import { safeStorage, BrowserWindow } from 'electron';
 import type { AccountInfo, AccountsState } from '../../shared/types';
 import { paths } from '../util/paths';
 import { readJson, writeJson } from '../util/store';
+import { AccountUnreadableError } from '../util/errors';
 import { loginInteractive, loginWithRefreshToken, type MinecraftSession } from './microsoft';
 
 interface StoredAccount extends AccountInfo {
@@ -28,8 +29,15 @@ function encrypt(text: string): string {
   return safeStorage.encryptString(text).toString('base64');
 }
 
+/** Tokens, die mit einem anderen Windows-Benutzer/PC verschluesselt wurden, lassen sich nicht lesen */
+class DecryptError extends Error {}
+
 function decrypt(b64: string): string {
-  return safeStorage.decryptString(Buffer.from(b64, 'base64'));
+  try {
+    return safeStorage.decryptString(Buffer.from(b64, 'base64'));
+  } catch (e) {
+    throw new DecryptError((e as Error).message);
+  }
 }
 
 function load(): AccountFile {
@@ -99,7 +107,19 @@ export async function getActiveSession(): Promise<MinecraftSession> {
   const f = load();
   const acc = f.accounts.find((a) => a.uuid === f.activeUuid);
   if (!acc) throw new Error('Bitte zuerst mit einem Microsoft-Account anmelden.');
+  try {
+    return await readSession(acc);
+  } catch (e) {
+    if (e instanceof DecryptError) {
+      // Account ist auf diesem PC unbrauchbar: entfernen, damit man sich einfach neu anmelden kann
+      removeAccount(acc.uuid);
+      throw new AccountUnreadableError();
+    }
+    throw e;
+  }
+}
 
+async function readSession(acc: StoredAccount): Promise<MinecraftSession> {
   if (acc.expiresAt - Date.now() > 10 * 60 * 1000) {
     return {
       uuid: acc.uuid,
@@ -116,7 +136,9 @@ export async function getActiveSession(): Promise<MinecraftSession> {
     upsert(session, true);
     return session;
   } catch (e) {
-    throw new Error(`Anmeldung für ${acc.name} abgelaufen – bitte Account neu hinzufügen. (${(e as Error).message})`);
+    if (e instanceof DecryptError) throw e;
+    console.error('[Login] Refresh fehlgeschlagen:', (e as Error).message);
+    throw new Error(`Die Anmeldung für ${acc.name} ist abgelaufen. Bitte füge den Account im Account-Menü neu hinzu.`);
   }
 }
 
@@ -127,8 +149,10 @@ export async function refreshAllQuietly(): Promise<AccountsState> {
     if (acc.expiresAt - Date.now() > 60 * 60 * 1000) continue;
     try {
       upsert(await loginWithRefreshToken(decrypt(acc.refresh)), false);
-    } catch {
-      /* offline oder Token ungültig – wird beim Spielstart gemeldet */
+    } catch (e) {
+      // nicht lesbar (anderer PC/Benutzer): Account entfernen, sonst sieht der Spieler einen "angemeldeten" Account, der nie startet
+      if (e instanceof DecryptError) removeAccount(acc.uuid);
+      /* sonst offline oder Token ungueltig - wird beim Spielstart gemeldet */
     }
   }
   return getAccountsState();

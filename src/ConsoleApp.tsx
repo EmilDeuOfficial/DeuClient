@@ -5,6 +5,7 @@ import { api, onEvent } from './api';
 import { Icon } from './components/Icons';
 import { TitleBar } from './components/TitleBar';
 import { translate, type TKey } from './i18n';
+import { translateLine } from './autotranslate';
 
 function lineClass(line: string): string {
   if (line.startsWith('[DeuClient]')) return 'text-accent-300';
@@ -80,7 +81,7 @@ export default function ConsoleApp() {
       <div className="min-h-0 flex-1 select-text overflow-auto px-4 py-3 font-mono text-[12px] leading-[1.55]">
         {!shown.length && <div className="text-ink-200/40">{t('console.empty')}</div>}
         {shown.map((l, i) => (
-          <div key={i} className={`whitespace-pre-wrap break-all ${lineClass(l)}`}>{l}</div>
+          <div key={i} className={`whitespace-pre-wrap break-all ${lineClass(l)}`}>{l.startsWith('[DeuClient]') ? translateLine(l, lang) : l}</div>
         ))}
         <div ref={bottom} />
       </div>

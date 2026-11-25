@@ -56,7 +56,7 @@ export function AccountMenu() {
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-3 rounded-2xl border border-white/10 bg-ink-850/70 py-1.5 pl-2.5 pr-3.5 transition hover:border-accent-400/40"
       >
-        <SkinHead url={active.skinUrl} size={28} className="shadow-[0_0_0_2px_rgba(34,197,94,.6)]" />
+        <SkinHead url={active.skinUrl} size={24} />
         <div className="text-left leading-tight">
           <div className="text-sm font-bold text-white">{active.name}</div>
           <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-300/80">Microsoft</div>
@@ -70,7 +70,7 @@ export function AccountMenu() {
           {accounts.accounts.map((a) => (
             <div key={a.uuid} className={`group flex items-center gap-2.5 rounded-xl px-2 py-2 transition ${a.uuid === active.uuid ? 'bg-accent-400/10' : 'hover:bg-white/5'}`}>
               <button className="flex flex-1 items-center gap-2.5 text-left" onClick={async () => { setAccounts(await api.accounts.select(a.uuid)); setOpen(false); }}>
-                <SkinHead url={a.skinUrl} size={26} />
+                <SkinHead url={a.skinUrl} size={24} />
                 <span className="text-sm font-semibold">{a.name}</span>
                 {a.uuid === active.uuid && <Icon name="check" size={14} className="text-accent-300" />}
               </button>
