@@ -44,7 +44,8 @@ export function deuCoreInfo(): { version: string; minecraft: string[] } | null {
   const m = managedManifest();
   const versions = Object.keys(m.deucore);
   if (!versions.length) return null;
-  return { version: versions.map((v) => `${m.deucore[v]} (${v})`).join(', '), minecraft: versions };
+  const short = (v: string) => v.replace(/^(d+.d+).0$/, '$1');
+  return { version: versions.map((v) => `${short(m.deucore[v])} (${v})`).join(', '), minecraft: versions };
 }
 
 export function managedModsFor(inst: Instance): ManagedMod[] {

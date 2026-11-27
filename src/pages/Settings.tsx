@@ -316,12 +316,12 @@ export function Settings() {
           <span className="text-sm text-ink-200/70">
             {update.state === 'checking' && t('update.checking')}
             {update.state === 'none' && (update.error ?? t('update.none'))}
-            {update.state === 'downloading' && `${t('update.downloading')} ${update.version ?? ''} (${update.percent ?? 0}%)`}
+            {update.state === 'downloading' && `${t('update.downloading')} ${shortVersion(update.version ?? '')} (${update.percent ?? 0}%)`}
             {update.state === 'ready' && t('update.ready')}
             {update.state === 'error' && <span className="text-red-300">{update.error}</span>}
           </span>
           {update.state === 'ready' && (
-            <button className="btn-accent" onClick={() => void api.update.install()}>{t('update.install')} {update.version}</button>
+            <button className="btn-accent" onClick={() => void api.update.install()}>{t('update.install')} {shortVersion(update.version ?? '')}</button>
           )}
         </div>
         <button className="btn-ghost" onClick={() => api.app.openDataFolder()}>

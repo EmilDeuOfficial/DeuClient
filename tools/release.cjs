@@ -3,7 +3,7 @@
  *
  * Usage:  1. raise "version" in package.json
  *         2. npm run build      (creates release/DeuClient-Setup.exe and release/latest.yml)
- *         3. npm run release    (creates the release v<version> with the three files)
+ *         3. npm run release    (creates the release, e.g. v1.0, with the three files)
  *
  * Needs the GitHub CLI (gh) to be logged in.
  */
@@ -13,7 +13,8 @@ const { execFileSync } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const { version } = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-const tag = `v${version}`;
+// package.json needs the long form (1.0.0), the release is called v1.0 (1.4.2 stays v1.4.2)
+const tag = `v${version.replace(/^(d+.d+).0$/, '$1')}`;
 const files = ['DeuClient-Setup.exe', 'DeuClient-Setup.exe.blockmap', 'latest.yml'].map((f) => path.join(root, 'release', f));
 
 for (const f of files) {
@@ -36,5 +37,5 @@ try {
 } catch {
   // release does not exist yet: good
 }
-gh(['release', 'create', tag, ...files, '--title', `DeuClient ${version}`, '--notes', `DeuClient ${version}`]);
+gh(['release', 'create', tag, ...files, '--title', `DeuClient ${tag}`, '--notes', `DeuClient ${tag}`]);
 console.log(`Published ${tag}. Installed launchers update themselves.`);

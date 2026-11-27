@@ -1,7 +1,6 @@
 # DeuClient
 
-![Version](https://img.shields.io/badge/launcher-v1.0.0-2EFF7A)
-![DeuCore](https://img.shields.io/badge/DeuCore-1.4.0-2EFF7A)
+![Version](https://img.shields.io/badge/version-v1.0-2EFF7A)
 ![Minecraft](https://img.shields.io/badge/Minecraft-26.3-1C1C1C)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-1C1C1C)
 ![License](https://img.shields.io/badge/license-proprietary-22C55E)

@@ -1,7 +1,7 @@
 /** Seitenleiste mit Navigation: Home, Instanzen, Mods, Einstellungen. */
 import { useApp, type Page } from '../store';
 import { api } from '../api';
-import { APP_VERSION } from '../version';
+import { APP_VERSION, shortVersion } from '../version';
 import { Icon, type IconName } from './Icons';
 
 const ITEMS: { page: Page; icon: IconName; key: 'nav.home' | 'nav.modpacks' | 'nav.servers' | 'nav.shop' | 'nav.extras' | 'nav.settings' }[] = [
@@ -68,7 +68,7 @@ export function Sidebar() {
         )}
         {update.state === 'ready' && (
           <button onClick={() => void api.update.install()} className="btn-accent w-full !py-2 text-xs">
-            {t('update.install')} {update.version}
+            {t('update.install')} {shortVersion(update.version ?? '')}
           </button>
         )}
         <div className="text-center text-[10px] tracking-wider text-ink-200/35">DeuClient v{APP_VERSION}</div>
