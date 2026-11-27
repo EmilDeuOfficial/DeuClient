@@ -50,6 +50,26 @@ export interface WorldInfo {
   lastPlayed: number;
   sizeMb: number;
   icon?: string;
+  gameMode?: number;
+  hardcore?: boolean;
+}
+
+export type WorldDifficulty = 'peaceful' | 'easy' | 'normal' | 'hard';
+
+export type WorldRule =
+  | 'keepInventory' | 'mobGriefing' | 'daylightCycle' | 'weatherCycle'
+  | 'mobSpawning' | 'immediateRespawn' | 'fallDamage' | 'pvp';
+
+export interface WorldSettings {
+  name: string;
+  /** 0 Überleben, 1 Kreativ, 2 Abenteuer, 3 Zuschauer */
+  gameMode: number;
+  difficulty: WorldDifficulty;
+  difficultyLocked: boolean;
+  hardcore: boolean;
+  allowCommands: boolean;
+  /** nur die Spielregeln, die die Welt kennt */
+  rules: Partial<Record<WorldRule, boolean>>;
 }
 
 export interface ScreenshotInfo {
@@ -96,6 +116,8 @@ export interface Settings {
   animations: boolean;
   /** Prozess-Prioritaet von Minecraft */
   gamePriority: 'normal' | 'high';
+  /** Themefarbe (#rrggbb) fuer Launcher und Spiel */
+  themeColor: string;
 }
 
 export interface SystemInfo {
@@ -332,6 +354,7 @@ export interface UpdateStatus {
 
 export interface EventMap {
   'update:status': UpdateStatus;
+  'settings:changed': Settings;
   'launch:progress': ProgressEvent;
   'game:state': GameState;
   'game:log': string[];

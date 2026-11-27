@@ -37,45 +37,77 @@ public final class Crosshair {
 
     /** Zeichnet das Fadenkreuz zentriert um (cx, cy) - auch für die Vorschau im Mod-Menü */
     public static void draw(GuiGraphicsExtractor g, int cx, int cy, int style, int color) {
-        int shadow = 0x88000000;
-        switch (Math.floorMod(style, STYLES.length)) {
-            case 0 -> { cross(g, cx, cy, shadow, 1); cross(g, cx, cy, color, 0); }
-            case 1 -> { g.fill(cx - 2, cy - 2, cx + 2, cy + 2, shadow); g.fill(cx - 1, cy - 1, cx + 1, cy + 1, color); }
-            case 2 -> { cross(g, cx, cy, color, 0); g.fill(cx - 1, cy - 1, cx + 1, cy + 1, color); g.fill(cx - 1, cy - 1, cx + 1, cy + 1, color); }
-            case 3 -> {
-                for (int a = 0; a < 360; a += 15) {
-                    double r = Math.toRadians(a);
-                    int x = cx + (int) Math.round(Math.cos(r) * 4), y = cy + (int) Math.round(Math.sin(r) * 4);
-                    g.fill(x, y, x + 1, y + 1, color);
-                }
-                g.fill(cx, cy, cx + 1, cy + 1, color);
+        Theme.paused = true;
+        try {
+            drawShape(g, cx, cy, style, color);
+        } finally {
+            Theme.paused = false;
+        }
+    }
+
+    /** Pixel des Kreisrings (ein Viertel; gespiegelt ergibt es einen gleichmaessigen Kreis mit Radius 4) */
+    private static final int[][] RING = {{0, 4}, {1, 4}, {2, 3}, {3, 3}, {3, 2}, {4, 1}, {4, 0}};
+
+    /*
+     * Alle Formen liegen punktsymmetrisch um das Pixel (cx, cy). Zuerst wird jede Form als Pixelmuster gesammelt und
+     * mit einem gleichmaessigen Schatten unterlegt, dann in der Farbe gezeichnet.
+     */
+    private static void drawShape(GuiGraphicsExtractor g, int cx, int cy, int style, int color) {
+        final int half = GRID / 2, size = GRID;
+        boolean[] on = new boolean[size * size];
+        java.util.function.BiConsumer<Integer, Integer> set = (x, y) -> on[(y + half) * size + x + half] = true;
+        int s = Math.floorMod(style, STYLES.length);
+        if (s == 0 || s == 2) { // Kreuz mit Luecke
+            for (int i = 2; i <= 5; i++) {
+                set.accept(i, 0);
+                set.accept(-i, 0);
+                set.accept(0, i);
+                set.accept(0, -i);
             }
-            case 5 -> {
-                String px = DeuConfig.get().crosshairPixels;
-                int n = GRID;
-                if (px != null && px.length() == n * n) {
-                    for (int i = 0; i < n * n; i++) {
-                        if (px.charAt(i) == '1') {
-                            int x = cx - n / 2 + i % n, y = cy - n / 2 + i / n;
-                            g.fill(x, y, x + 1, y + 1, color);
-                        }
-                    }
+        }
+        if (s == 1) { // Punkt, 3 x 3
+            for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) set.accept(x, y);
+        }
+        if (s == 2) set.accept(0, 0);
+        if (s == 3) { // Kreis mit Mittelpunkt
+            for (int[] p : RING) {
+                set.accept(p[0], p[1]);
+                set.accept(-p[0], p[1]);
+                set.accept(p[0], -p[1]);
+                set.accept(-p[0], -p[1]);
+            }
+            set.accept(0, 0);
+        }
+        if (s == 4) { // Pfeil, Spitze in der Mitte
+            for (int i = 0; i <= 4; i++) {
+                set.accept(i, i);
+                set.accept(-i, i);
+            }
+        }
+        if (s == 5) {
+            String px = DeuConfig.get().crosshairPixels;
+            if (px != null && px.length() == size * size) {
+                for (int i = 0; i < size * size; i++) on[i] = px.charAt(i) == '1';
+            }
+        }
+        // Schatten: jedes freie Nachbarpixel genau einmal (auch ueber den Rand des Musters hinaus)
+        for (int y = -half - 1; y <= half + 1; y++) {
+            for (int x = -half - 1; x <= half + 1; x++) {
+                if (at(on, x, y)) continue;
+                if (at(on, x - 1, y) || at(on, x + 1, y) || at(on, x, y - 1) || at(on, x, y + 1)) {
+                    g.fill(cx + x, cy + y, cx + x + 1, cy + y + 1, 0x80000000);
                 }
             }
-            default -> {
-                for (int i = 0; i < 5; i++) {
-                    g.fill(cx - i, cy + i, cx - i + 1, cy + i + 1, color);
-                    g.fill(cx + i, cy + i, cx + i + 1, cy + i + 1, color);
-                }
+        }
+        for (int y = -half; y <= half; y++) {
+            for (int x = -half; x <= half; x++) {
+                if (at(on, x, y)) g.fill(cx + x, cy + y, cx + x + 1, cy + y + 1, color);
             }
         }
     }
 
-    /** Kreuz mit Lücke in der Mitte */
-    private static void cross(GuiGraphicsExtractor g, int cx, int cy, int color, int grow) {
-        g.fill(cx - 5 - grow, cy - grow, cx - 1 + grow, cy + 1 + grow, color);
-        g.fill(cx + 2 - grow, cy - grow, cx + 6 + grow, cy + 1 + grow, color);
-        g.fill(cx - grow, cy - 5 - grow, cx + 1 + grow, cy - 1 + grow, color);
-        g.fill(cx - grow, cy + 2 - grow, cx + 1 + grow, cy + 6 + grow, color);
+    private static boolean at(boolean[] on, int x, int y) {
+        int half = GRID / 2;
+        return Math.abs(x) <= half && Math.abs(y) <= half && on[(y + half) * GRID + x + half];
     }
 }

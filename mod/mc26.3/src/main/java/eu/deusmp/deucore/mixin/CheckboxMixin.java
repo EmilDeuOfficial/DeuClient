@@ -25,8 +25,8 @@ public abstract class CheckboxMixin {
             return;
         }
         boolean hover = sprite.getPath().contains("highlighted");
-        DeuRender.roundRect(g, x, y, w, h, 3, hover || this.selected ? 0xFF2EFF7A : 0xFF3A4440);
-        DeuRender.roundRect(g, x + 1, y + 1, w - 2, h - 2, 2, this.selected ? 0xFF1C5A2C : 0xFF0A0F0C);
+        DeuRender.roundRect(g, x, y, w, h, 3, hover || this.selected ? 0xFF2EFF7A : 0xFF3A3D44);
+        DeuRender.roundRect(g, x + 1, y + 1, w - 2, h - 2, 2, this.selected ? 0xFF1C5A2C : 0xFF121418);
         if (this.selected) Ui.icon(g, Ui.I_CHECK, x + 2, y + 2, w - 4, 0xFF7CF29C);
     }
 }

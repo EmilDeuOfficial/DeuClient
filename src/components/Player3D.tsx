@@ -112,20 +112,39 @@ function faceStyle(p: Part, f: Face): React.CSSProperties {
 }
 
 
-/** Cape als duenner Quader (1 Skin-Pixel dick): Aussenseite mit Motiv, Innenseite dunkel, Kanten in Randfarbe */
-function capeFaces(url: string) {
+/** Ausschnitte der Cape-Textur im 64x32-Raster: Aussenseite und die vier Kanten */
+const CAPE_UV = { out: [1, 1, 10, 16], l: [0, 1, 1, 16], r: [11, 1, 1, 16], t: [1, 0, 10, 1], b: [11, 0, 10, 1] } as const;
+type CapeImages = Record<keyof typeof CAPE_UV, string>;
+
+function capeImages(img: HTMLImageElement): CapeImages {
+  const k = Math.max(1, Math.round(img.width / 64));
+  const cut = ([x, y, w, h]: readonly number[]) => {
+    const c = document.createElement('canvas');
+    c.width = w * k;
+    c.height = h * k;
+    const ctx = c.getContext('2d')!;
+    ctx.imageSmoothingEnabled = k > 1;
+    ctx.drawImage(img, x * k, y * k, w * k, h * k, 0, 0, w * k, h * k);
+    return c.toDataURL('image/png');
+  };
+  return Object.fromEntries(Object.entries(CAPE_UV).map(([key, uv]) => [key, cut(uv)])) as CapeImages;
+}
+
+/** Cape als duenner Quader (1 Skin-Pixel dick): Aussenseite mit Motiv, Innenseite dunkel, Kanten aus der Textur */
+function capeFaces(urls: CapeImages) {
   const T = CAPE.t * S, W = CAPE.w * S, H = CAPE.h * S;
   const face = (key: string, w: number, h: number, transform: string, style: React.CSSProperties) => (
     <div key={key} style={{ position: 'absolute', width: w, height: h, left: -w / 2, top: -h / 2, transform, ...style }} />
   );
-  const img = { backgroundImage: `url(${url})`, backgroundSize: '100% 100%' };
-  const edge = { background: '#1a2a20' };
+  const tex = (url: string) => ({ backgroundImage: `url(${url})`, backgroundSize: '100% 100%' });
+  const img = tex(urls.out);
   return [
     face('out', W, H, `rotateY(180deg) translateZ(${T / 2}px)`, img),
     face('in', W, H, `translateZ(${T / 2}px)`, { ...img, filter: 'brightness(0.45)' }),
-    face('l', T, H, `rotateY(-90deg) translateZ(${W / 2}px)`, edge),
-    face('r', T, H, `rotateY(90deg) translateZ(${W / 2}px)`, edge),
-    face('b', W, T, `rotateX(-90deg) translateZ(${H / 2}px)`, edge),
+    face('l', T, H, `rotateY(-90deg) translateZ(${W / 2}px)`, tex(urls.l)),
+    face('r', T, H, `rotateY(90deg) translateZ(${W / 2}px)`, tex(urls.r)),
+    face('t', W, T, `rotateX(90deg) translateZ(${H / 2}px)`, tex(urls.t)),
+    face('b', W, T, `rotateX(-90deg) translateZ(${H / 2}px)`, tex(urls.b)),
   ];
 }
 
@@ -162,7 +181,7 @@ function WingsCanvas({ assets, angle, zoom, cape }: { assets: WingAssets; angle:
 
 export function Player3D({ skinUrl, cape, wings }: { skinUrl?: string; cape: string; wings: string }) {
   const [faces, setFaces] = useState<Record<string, string>>({});
-  const [capeUrl, setCapeUrl] = useState('');
+  const [capeTex, setCapeTex] = useState<CapeImages | null>(null);
   const [angle, setAngle] = useState(200);
   const [wingAssets, setWingAssets] = useState<WingAssets | null>(null);
   const [box, setBox] = useState({ w: 268, h: 230 });
@@ -202,17 +221,10 @@ export function Player3D({ skinUrl, cape, wings }: { skinUrl?: string; cape: str
 
   useEffect(() => {
     let off = false;
-    if (!cape) { setCapeUrl(''); return; }
+    if (!cape) { setCapeTex(null); return; }
     void loadImage(`./cosmetics/cape/${cape}.png`).then((img) => {
       if (off || !img) return;
-      const k = Math.max(1, Math.round(img.width / 64));
-      const c = document.createElement('canvas');
-      c.width = 10 * k;
-      c.height = 16 * k;
-      const ctx = c.getContext('2d')!;
-      ctx.imageSmoothingEnabled = k > 1;
-      ctx.drawImage(img, k, k, 10 * k, 16 * k, 0, 0, 10 * k, 16 * k);
-      setCapeUrl(c.toDataURL('image/png'));
+      setCapeTex(capeImages(img));
     });
     return () => { off = true; };
   }, [cape]);
@@ -236,13 +248,13 @@ export function Player3D({ skinUrl, cape, wings }: { skinUrl?: string; cape: str
               ))}
             </div>
           ))}
-          {capeUrl && (
+          {capeTex && (
             <div style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0, transformStyle: 'preserve-3d', transformOrigin: `0px ${CAPE.pivotY * S}px`, transform: `translate3d(0, 0, ${CAPE.z * S}px) rotateX(${CAPE.tilt}deg)` }}>
-              {capeFaces(capeUrl)}
+              {capeFaces(capeTex)}
             </div>
           )}
         </div>
-        {wingAssets && <WingsCanvas assets={wingAssets} angle={angle} zoom={zoom} cape={!!capeUrl} />}
+        {wingAssets && <WingsCanvas assets={wingAssets} angle={angle} zoom={zoom} cape={!!capeTex} />}
       </div>
       <div className="flex justify-center gap-2">
         <button className="btn-ghost !px-3 !py-1 text-xs" onClick={() => setAngle(0)}>Vorne</button>

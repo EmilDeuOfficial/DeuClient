@@ -78,15 +78,15 @@ public class DiscordGlassClient implements ClientModInitializer {
          String details;
          String state;
          if (mc.level == null) {
-            details = "Im Hauptmenü";
+            details = eu.deusmp.deucore.Tr.t("Im Hauptmenü");
             state = "Minecraft 26.3";
          } else if (mc.isLocalServer()) {
-            details = "Spielt Einzelspieler";
+            details = eu.deusmp.deucore.Tr.t("Spielt Einzelspieler");
             state = "Minecraft 26.3";
          } else {
             ServerData sd = mc.getCurrentServer();
-            details = "Spielt Mehrspieler";
-            state = sd == null ? "Minecraft 26.3" : (sd.name != null && !sd.name.isBlank() ? sd.name : "Auf einem Server");
+            details = eu.deusmp.deucore.Tr.t("Spielt Mehrspieler");
+            state = sd == null ? "Minecraft 26.3" : (sd.name != null && !sd.name.isBlank() ? sd.name : eu.deusmp.deucore.Tr.t("Auf einem Server"));
          }
 
          dc.updateActivity(details, state);

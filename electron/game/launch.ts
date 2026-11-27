@@ -288,6 +288,8 @@ export async function launchGame(opts: LaunchOptions, hooks: LaunchHooks): Promi
   if (session.skinUrl) jvm.push(`-Ddeuclient.skin=${session.skinUrl}`);
   // Datenordner des Launchers: DeuCore meldet hier die im Spiel gewaehlten Cosmetics zurueck (cosmetics.json)
   jvm.push(`-Ddeuclient.data=${paths.data}`);
+  // Themefarbe: DeuCore uebernimmt sie, solange im Spiel "Wie Launcher" gewaehlt ist
+  if (/^#[0-9a-f]{6}$/i.test(settings.themeColor)) jvm.push(`-Ddeuclient.theme=${settings.themeColor}`);
   if (version.arguments?.jvm) jvm.push(...expandArgs(version.arguments.jvm, vars, features));
   else jvm.push(...expandArgs(['-Djava.library.path=${natives_directory}', '-cp', '${classpath}'], vars, features));
 

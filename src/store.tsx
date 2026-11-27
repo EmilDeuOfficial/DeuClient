@@ -2,6 +2,7 @@
  * Globaler App-Zustand (React Context): Einstellungen, Accounts, Instanzen, Spielstatus,
  * Start-Fortschritt und Toast-Benachrichtigungen.
  */
+import { applyTheme } from './theme';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { AccountsState, GameState, Instance, ProgressEvent, Settings, UpdateStatus } from '../shared/types';
 import { api, onEvent } from './api';
@@ -123,6 +124,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.classList.toggle('no-motion', settings?.animations === false);
   }, [settings?.animations]);
+  useEffect(() => applyTheme(settings?.themeColor), [settings?.themeColor]);
 
   const lang = settings?.language ?? 'de';
   const t = useCallback((key: TKey) => translate(lang, key), [lang]);

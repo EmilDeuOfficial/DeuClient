@@ -84,31 +84,36 @@ public final class Overlay {
       return (extraCount(r) + 3) / 4;
    }
 
-   private static int[] place(Screen screen, int ph) {
+   private static int[] place(Screen screen, int pw, int ph) {
       int gx = (screen.width - 176) / 2;
       int gy = 0;
       int gw = 176;
+      int gh = 166;
       if (screen instanceof AbstractContainerScreen) {
          ScreenRectangle r = screen.getRectangle();
          if (r.width() > 60 && r.width() < screen.width - 20) {
             gx = r.left();
             gw = r.width();
             gy = r.top();
+            gh = r.height();
          } else {
             gy = (screen.height - 166) / 2;
          }
       }
 
-      int x = gx + gw + 8;
-      if (x + 146 > screen.width - 4) {
-         x = gx - 146 - 8;
-      }
-
+      // Standard: links neben dem Menue, mit festem Abstand (klebt nicht am Menue); nur wenn links kein Platz ist, rechts daneben
+      int gap = 14;
+      int x = gx - pw - gap;
       if (x < 4) {
-         x = Math.max(4, screen.width - 146 - 4);
+         x = gx + gw + gap;
+         if (x + pw > screen.width - 4) {
+            x = Math.max(4, screen.width - pw - 4);
+         }
       }
 
-      int y = Math.max(4, Math.min(screen.height - ph - 4, gy));
+      // senkrecht zum Menue zentriert (nicht buendig an der Oberkante)
+      int menuH = gh;
+      int y = Math.max(4, Math.min(screen.height - ph - 4, gy + (menuH - ph) / 2));
       return new int[]{x, y};
    }
 
@@ -121,12 +126,18 @@ public final class Overlay {
       Font font = mc.font;
       boolean extras = cfg.showExtras && r.hasExtras();
       int ph = heightFor(r, cfg.showExtras);
-      int[] pos = place(screen, ph);
-      int x = pos[0];
-      int y = pos[1];
-      float op = Glass.opacity();
-      Glass.glow(g, x, y, 146, ph, 9, Glass.accent(), 5, 0.45F);
-      Glass.card(g, x, y, 146, ph, 9, op);
+      float zoom = de.erik.glasshud.hud.HudRenderer.snapScale(cfg.scale);
+      int[] pos = place(screen, Math.round(146 * zoom), Math.round(ph * zoom));
+      g.pose().pushMatrix();
+      g.pose().translate(pos[0], pos[1]);
+      g.pose().scale(zoom, zoom);
+      int x = 0;
+      int y = 0;
+      float op = 1.0F - Math.max(0, Math.min(100, cfg.bgTransparency)) / 100.0F;
+      // ruhiger Kasten ohne Rand, Leuchten und Farbverlauf: 1 = dunkel, 2 = schwarz, 0 = aus
+      if (cfg.bgStyle != 0) {
+         Glass.roundRect(g, x, y, 146, ph, 9, Math.round(0xE6 * op) << 24 | (cfg.bgStyle == 2 ? 0x000000 : 0x121418));
+      }
       Glass.icon(g, Glass.ICON_EYE, x + 9, y + 11, Glass.accent());
       Fx.text(g, font, "Scout", x + 23, y + 9, -855048, false);
       if (target != null && !target.isEmpty()) {
@@ -161,8 +172,8 @@ public final class Overlay {
          Glass.inset(g, cx + 1, cy, cell - 2, 24, 5, op);
          if (low) {
             float p = Glass.pulse(1000L);
-            Glass.glow(g, cx + 1, cy, cell - 2, 24, 5, colorFor(a.fraction()), 3, 0.6F + 0.4F * p);
-            Glass.roundOutline(g, cx + 1, cy, cell - 2, 24, 5, Glass.alpha(colorFor(a.fraction()), 0.7F + 0.3F * p));
+            // schwaechstes Teil: pulsierend eingefaerbte Kachel
+            Glass.roundRect(g, cx + 1, cy, cell - 2, 24, 5, Glass.alpha(colorFor(a.fraction()), 0.25F + 0.25F * p));
          }
 
          if (a != null) {
@@ -213,6 +224,8 @@ public final class Overlay {
             }
          }
       }
+
+      g.pose().popMatrix();
    }
 
    private static int row(GuiGraphicsExtractor g, Font font, int x, int y, ItemStack icon, String label, int count, int stripe) {
@@ -226,7 +239,7 @@ public final class Overlay {
    }
 
    static int colorFor(float f) {
-      return f > 0.6F ? -10682467 : (f > 0.3F ? -11930 : -41870);
+      return f > 0.6F ? 0xFF63E04A : (f > 0.3F ? -11930 : -41870);
    }
 
    private static void barH(GuiGraphicsExtractor g, int x, int y, int w, int h, float f) {

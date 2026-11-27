@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: Settings = {
   selectedInstance: 'deusmp',
   launchOnStartup: false,
   animations: true,
+  themeColor: '#2eff7a',
   gamePriority: 'normal',
 };
 

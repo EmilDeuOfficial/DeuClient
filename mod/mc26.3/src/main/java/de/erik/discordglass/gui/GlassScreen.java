@@ -1,1010 +1,958 @@
 package de.erik.discordglass.gui;
 
-import eu.deusmp.deucore.Fx;
+import com.mojang.blaze3d.platform.InputConstants;
 import de.erik.discordglass.config.GlassConfig;
 import de.erik.discordglass.config.Hotkey;
 import de.erik.discordglass.discord.DiscordClient;
 import de.erik.discordglass.discord.DiscordState;
+import eu.deusmp.deucore.DeuRender;
+import eu.deusmp.deucore.Features;
+import eu.deusmp.deucore.screen.FeatureSettingsScreen;
+import eu.deusmp.deucore.screen.Ui;
 import java.text.Normalizer;
-import java.text.Normalizer.Form;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FormattedText;
-import net.minecraft.network.chat.Style;
 import net.minecraft.util.FormattedCharSequence;
+import net.minecraft.util.Mth;
 
+/**
+ * Discord-Fenster im Stil des Mod-Menues: eine Kopfzeile, zwei Reiter.
+ * "Call": links Freunde und Server bzw. Sprachkanaele, rechts der laufende Anruf. "Text": links Freunde und Textkanaele,
+ * rechts die Nachrichten (lesen und in Discord antworten). "Einstellungen": Overlay, Verbindung, Tasten.
+ */
 public class GlassScreen extends Screen {
-   private static GlassScreen.Tab lastTab = GlassScreen.Tab.OVERVIEW;
+   private static final int ROW = 20;
+   private static final int RED = 0xFFFF6B7D;
+   private enum Page { CALL, TEXT, SETTINGS }
+   private static GlassScreen.Page lastPage = GlassScreen.Page.CALL;
+
    private final Screen parent;
-   private GlassScreen.Tab tab = lastTab;
-   private final List<GlassScreen.Hit> hits = new ArrayList<>();
-   private final List<GlassScreen.Scroll> scrolls = new ArrayList<>();
-   private final Map<String, Float> anims = new HashMap<>();
+   private GlassScreen.Page page = lastPage;
+   private final List<Hit> hits = new ArrayList<>();
+   private final List<Scroll> scrolls = new ArrayList<>();
    private Hotkey capturing;
-   private int memberScroll;
-   private int guildScroll;
-   private int channelScroll;
    private String selectedGuild;
-   private String guildFilter = "";
-   private String channelFilter = "";
-   private EditBox guildBox;
-   private EditBox channelBox;
-   private long openedAt;
-   private long lastFrame;
-   private float dt;
-   private float tabY = -1.0F;
-   private int px;
-   private int py;
-   private int pw;
-   private int ph;
+   private String filter = "";
+   private int listScroll;
+   private int memberScroll;
+   private int leftScroll;
+   private int rightScroll;
+   private String textGuild;
+   private int textListScroll;
+   /** Abstand zur neuesten Nachricht in Bildpunkten */
+   private int messageScroll;
+   /** Im Text-Reiter angewaehlte Person, zu der noch kein Chat bekannt ist */
+   private String friendWithoutChat;
+   /** Hilfetext unter der Maus, in diesem Bild gesetzt */
+   private String tip;
+   private int[] demoMouse;
+   private EditBox searchBox;
    private EditBox idBox;
    private EditBox secretBox;
-   private EditBox redirectBox;
-   private double lastMouseX;
-   private GlassScreen.Hit slider;
 
    public GlassScreen(Screen parent) {
-      super(Component.literal("Discord Glass"));
+      super(Component.literal("Discord"));
       this.parent = parent;
    }
 
-   public static GlassScreen demo(Screen parent, int tabIndex, String guild, boolean captureMute) {
-      lastTab = GlassScreen.Tab.values()[tabIndex];
-      GlassScreen sc = new GlassScreen(parent);
-      sc.selectedGuild = guild;
-      if (tabIndex == 1) {
-         sc.guildFilter = "b";
-      }
-
+   /** Nur fuer Testbilder: Reiter, geoeffneter Server und Tastenbelegung im Gange */
+   public static GlassScreen demo(Screen parent, int tab, String guild, boolean captureMute) {
+      lastPage = GlassScreen.Page.values()[tab];
+      GlassScreen screen = new GlassScreen(parent);
+      screen.selectedGuild = guild;
       if (captureMute) {
-         sc.capturing = GlassConfig.get().muteKey;
+         screen.capturing = GlassConfig.get().muteKey;
       }
 
-      return sc;
+      return screen;
    }
 
-   private int cx() {
-      return this.px + 122;
+   /** Nur fuer Testbilder: Maus an eine feste Stelle des Fensters setzen, damit Hover-Knoepfe sichtbar werden */
+   public GlassScreen demoHover(int x, int y) {
+      this.demoMouse = new int[]{x, y};
+      return this;
    }
 
-   private int cy() {
-      return this.py + 40;
+   /** Nur fuer Testbilder: Person ohne bekannten Chat anwaehlen */
+   public GlassScreen demoFriend(String userId) {
+      this.friendWithoutChat = userId;
+      return this;
    }
 
-   private int cw() {
-      return this.pw - 122 - 10;
-   }
+   /* ================= Masse ================= */
 
-   private int ch() {
-      return this.ph - 40 - 10;
-   }
+   private int pw() { return Math.min(600, this.width - 20); }
+   private int ph() { return Math.min(360, this.height - 20); }
+   private int px() { return (this.width - pw()) / 2; }
+   private int py() { return (this.height - ph()) / 2; }
+   private int cx() { return px() + 8; }
+   private int cy() { return py() + 40; }
+   private int cw() { return pw() - 16; }
+   private int ch() { return ph() - 48; }
+   private int listW() { return Mth.clamp(cw() * 2 / 5, 130, 220); }
 
+   @Override
    protected void init() {
-      if (this.openedAt == 0L) {
-         this.openedAt = System.currentTimeMillis();
-      }
-
-      this.pw = Math.min(450, this.width - 16);
-      this.ph = Math.min(272, this.height - 16);
-      this.px = (this.width - this.pw) / 2;
-      this.py = (this.height - this.ph) / 2;
-      this.idBox = this.secretBox = this.redirectBox = null;
-      this.guildBox = this.channelBox = null;
-      if (this.tab == GlassScreen.Tab.SERVERS) {
-         int top = this.cy() + 26;
-         int lw = (this.cw() - 6) / 2;
-         int kw = this.cw() - lw - 6;
-         this.guildBox = this.searchField(this.cx() + 4, top + 4, lw - 8, this.guildFilter, "Server suchen…", v -> {
-            this.guildFilter = v;
-            this.guildScroll = 0;
+      this.searchBox = this.idBox = this.secretBox = null;
+      GlassConfig cfg = GlassConfig.get();
+      if (this.page != GlassScreen.Page.SETTINGS) {
+         this.searchBox = this.box(this.filter, "Suchen", 48, v -> {
+            this.filter = v;
+            this.textListScroll = 0;
+            this.listScroll = 0;
          });
-         this.channelBox = this.searchField(this.cx() + lw + 6 + 4, top + 4, kw - 8, this.channelFilter, "Kanal suchen…", v -> {
-            this.channelFilter = v;
-            this.channelScroll = 0;
-         });
-      }
-
-      if (this.tab == GlassScreen.Tab.SETTINGS && GlassConfig.get().useOwnApp) {
-         GlassConfig cfg = GlassConfig.get();
-         int x = this.cx() + 62;
-         int w = this.cw() - 62;
-         this.idBox = this.field(x, this.cy() + 31, w, cfg.clientId, "Application ID", v -> cfg.clientId = v.trim());
-         this.secretBox = this.field(x, this.cy() + 51, w, cfg.clientSecret, "Client Secret", v -> cfg.clientSecret = v.trim());
-         EditBox sb = this.secretBox;
-         sb.addFormatter((s, off) -> FormattedCharSequence.forward(sb.isFocused() ? s : "•".repeat(s.length()), Style.EMPTY));
-      }
-
-      if (this.tab == GlassScreen.Tab.SERVERS && DiscordClient.INSTANCE.isConnected()) {
-         DiscordClient.INSTANCE.refreshGuilds();
-      }
-   }
-
-   private EditBox field(int x, int y, int w, String value, String hint, Consumer<String> onChange) {
-      EditBox box = new EditBox(this.font, x + 6, y + 4, w - 12, 10, Component.literal(hint));
-      box.setBordered(false);
-      box.setMaxLength(256);
-      box.setValue(value);
-      box.setHint(Component.literal(hint).withStyle(s -> s.withColor(6184562)));
-      box.setTextColor(-657926);
-      box.setResponder(v -> {
-         onChange.accept(v);
-         GlassConfig.save();
-      });
-      return (EditBox)this.addRenderableWidget(box);
-   }
-
-   private EditBox searchField(int x, int y, int w, String value, String hint, Consumer<String> onChange) {
-      EditBox box = new EditBox(this.font, x + 16, y + 3, w - 16 - 14, 10, Component.literal(hint));
-      box.setBordered(false);
-      box.setMaxLength(48);
-      box.setValue(value);
-      box.setHint(Component.literal(hint).withStyle(s -> s.withColor(6184562)));
-      box.setTextColor(-657926);
-      box.setResponder(onChange);
-      return (EditBox)this.addRenderableWidget(box);
-   }
-
-   private static String norm(String s) {
-      return Normalizer.normalize(s == null ? "" : s, Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(Locale.ROOT).trim();
-   }
-
-   private static <T> List<T> filter(List<T> all, String query, Function<T, String> name) {
-      String q = norm(query);
-      if (q.isEmpty()) {
-         return all;
-      } else {
-         List<T> out = new ArrayList<>();
-
-         for (T t : all) {
-            if (norm(name.apply(t)).contains(q)) {
-               out.add(t);
+         if (DiscordClient.INSTANCE.isConnected()) {
+            DiscordClient.INSTANCE.refreshGuilds();
+            String open = this.page == GlassScreen.Page.TEXT ? this.textGuild : this.selectedGuild;
+            if (open != null) {
+               DiscordClient.INSTANCE.loadChannels(open);
             }
          }
-
-         out.sort((a, b) -> Boolean.compare(!norm(name.apply((T)a)).startsWith(q), !norm(name.apply((T)b)).startsWith(q)));
-         return out;
+      } else if (cfg.useOwnApp) {
+         this.idBox = this.box(cfg.clientId, "Application ID", 256, v -> {
+            cfg.clientId = v.trim();
+            GlassConfig.save();
+         });
+         this.secretBox = this.box(cfg.clientSecret, "Client Secret", 256, v -> {
+            cfg.clientSecret = v.trim();
+            GlassConfig.save();
+         });
+         EditBox secret = this.secretBox;
+         secret.addFormatter((s, offset) -> FormattedCharSequence.forward(secret.isFocused() ? s : "•".repeat(s.length()), net.minecraft.network.chat.Style.EMPTY));
       }
    }
 
-   private void searchBar(GuiGraphicsExtractor g, int mx, int my, EditBox box, int x, int y, int w, String id) {
-      boolean focus = box.isFocused();
-      float f = this.anim("sf" + id, focus, 12.0F);
-      if (f > 0.01F) {
-         Glass.glow(g, x, y, w, 14, 5, 0xFF2EFF7A, 2, f);
-      }
-
-      Glass.roundRect(g, x, y, w, 14, 5, Glass.lerpColor(1342177280, -1879048192, f));
-      Glass.roundOutline(g, x, y, w, 14, 5, Glass.lerpColor(620756991, 0xFF2EFF7A, f));
-      Glass.icon(g, Glass.ICON_SEARCH, x + 5, y + 4, Glass.lerpColor(-10592654, 0xFF1FD35F, f));
-      if (!box.getValue().isEmpty()) {
-         int bx = x + w - 13;
-         int by = y + 2;
-         float hv = this.hover("sx" + id, in(mx, my, bx, by, 10, 10));
-         Glass.roundRect(g, bx, by, 10, 10, 5, Glass.alpha(822083583, 0.4F + 0.6F * hv));
-         Glass.icon(g, Glass.ICON_CLOSE, bx + 2, by + 2, Glass.lerpColor(-6184523, -1, hv));
-         this.hit(bx, by, 10, 10, () -> box.setValue(""));
-      }
+   /** Eingabefeld ohne Rahmen; Lage und Sichtbarkeit setzt das Zeichnen */
+   private EditBox box(String value, String hint, int max, Consumer<String> onChange) {
+      EditBox box = new EditBox(this.font, 0, 0, 80, 10, Component.literal(hint));
+      box.setBordered(false);
+      box.setMaxLength(max);
+      box.setValue(value);
+      // Platzhalter in der DeuClient-Schrift; selbst Getipptes bleibt wie ueberall in Minecraft
+      box.setHint(Component.literal(eu.deusmp.deucore.Tr.t(hint)).withStyle(s -> s.withColor(0x8B909A).withoutShadow().withFont(Ui.uiFont())));
+      box.setTextColor(Ui.TEXT);
+      box.setResponder(onChange);
+      box.visible = false;
+      return this.addRenderableWidget(box);
    }
 
-   private void switchTab(GlassScreen.Tab t) {
-      if (t != this.tab) {
-         this.tab = t;
-         lastTab = t;
-         this.capturing = null;
-         this.rebuildWidgets();
-      }
+   private void drawField(GuiGraphicsExtractor g, EditBox box, int x, int y, int w) {
+      DeuRender.roundRect(g, x, y, w, 16, 4, box.isFocused() ? 0xFF353A43 : 0xFF2A2E35);
+      box.setX(x + 6);
+      box.setY(y + 4);
+      box.setWidth(w - 12);
+      box.setTextShadow(!box.getValue().isEmpty()); // der Platzhalter ohne Schatten wie die uebrige Schrift
+      box.visible = true;
    }
 
+   @Override
    public boolean isPauseScreen() {
       return false;
    }
 
+   @Override
    public void onClose() {
       GlassConfig.save();
       this.minecraft.gui.setScreen(this.parent);
    }
 
-   private float anim(String key, boolean target, float speed) {
-      float v = this.anims.getOrDefault(key, target ? 1.0F : 0.0F);
-      float t = target ? 1.0F : 0.0F;
-      v += (t - v) * Math.min(1.0F, this.dt * speed);
-      if (Math.abs(t - v) < 0.002F) {
-         v = t;
-      }
-
-      this.anims.put(key, v);
-      return v;
+   @Override
+   public void extractBackground(GuiGraphicsExtractor g, int mx, int my, float delta) {
+      super.extractBackground(g, mx, my, delta);
+      g.fillGradient(0, 0, this.width, this.height, 0x8007080A, 0xA007080A);
    }
 
-   private float hover(String key, boolean hovered) {
-      return this.anim("h:" + key, hovered, 14.0F);
-   }
-
-   public void extractBackground(GuiGraphicsExtractor g, int mx, int my, float pt) {
-      super.extractBackground(g, mx, my, pt);
-      float a = Math.min(1.0F, (float)(System.currentTimeMillis() - this.openedAt) / 220.0F);
-      g.fillGradient(0, 0, this.width, this.height, Glass.alpha(-1342177280, a), Glass.alpha(-536870912, a));
-      int gx = this.width / 2;
-      int gy = this.height / 2;
-
-      for (int i = 0; i < 6; i++) {
-         int r = 60 + i * 30;
-         Glass.roundRect(g, gx - r * 2, gy - r, r * 4, r * 2, r, Glass.withAlpha(0xFF2EFF7A, (int)(5.0F * a)));
-      }
-   }
-
-   public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float pt) {
-      long now = System.currentTimeMillis();
-      this.dt = this.lastFrame == 0L ? 0.016F : Math.min(0.1F, (float)(now - this.lastFrame) / 1000.0F);
-      this.lastFrame = now;
+   @Override
+   public void extractRenderState(GuiGraphicsExtractor g, int mx, int my, float delta) {
       this.hits.clear();
       this.scrolls.clear();
-      this.slider = null;
-      float open = Math.min(1.0F, (float)(now - this.openedAt) / 260.0F);
-      float ease = 1.0F - (float)Math.pow(1.0F - open, 3.0);
-      g.pose().pushMatrix();
-      g.pose().translate(0.0F, (1.0F - ease) * 10.0F);
+      this.tip = null;
+      if (this.demoMouse != null) {
+         mx = px() + this.demoMouse[0];
+         my = py() + this.demoMouse[1];
+      }
+
+      for (EditBox b : new EditBox[]{this.searchBox, this.idBox, this.secretBox}) {
+         if (b != null) b.visible = false;
+      }
+
       DiscordState s = DiscordClient.INSTANCE.state;
-      Glass.glow(g, this.px, this.py, this.pw, this.ph, 12, 0xFF2EFF7A, 6, 0.55F * ease);
-      Glass.panel(g, this.px, this.py, this.pw, this.ph, 12, 0.6F + 0.4F * ease);
-      this.renderHeader(g, mx, my, s);
-      this.renderSidebar(g, mx, my, s);
-      switch (this.tab) {
-         case OVERVIEW:
-            this.renderOverview(g, mx, my, s);
-            break;
-         case SERVERS:
-            this.renderServers(g, mx, my, s);
-            break;
-         case HOTKEYS:
-            this.renderHotkeys(g, mx, my);
-            break;
-         case SETTINGS:
-            this.renderSettings(g, mx, my);
-      }
-
-      super.extractRenderState(g, mx, my, pt);
-      g.pose().popMatrix();
+      DeuRender.roundRect(g, px(), py(), pw(), ph(), 8, Ui.BG);
+      this.header(g, mx, my, s);
+      if (this.page == GlassScreen.Page.SETTINGS) this.settingsTab(g, mx, my);
+      else if (s.status != DiscordState.Status.CONNECTED) this.offline(g, mx, my, s);
+      else if (this.page == GlassScreen.Page.TEXT) this.textTab(g, mx, my, s);
+      else this.callTab(g, mx, my, s);
+      super.extractRenderState(g, mx, my, delta);
+      if (this.tip != null) Ui.tooltip(g, mx, my, this.tip, 170, this.width, this.height);
    }
 
-   private void renderHeader(GuiGraphicsExtractor g, int mx, int my, DiscordState s) {
-      int lx = this.px + 10;
-      int ly = this.py + 8;
-      Glass.glow(g, lx, ly, 20, 20, 6, 0xFF2EFF7A, 4, 0.8F);
-      Glass.roundGradient(g, lx, ly, 20, 20, 6, 0xFF2EFF7A, -10983950);
-      Glass.icon(g, Glass.ICON_HEADPHONES, lx + 6, ly + 5, -1);
-      Fx.text(g, this.font, "Discord Glass", lx + 27, ly + 2, -657926, false);
-      Fx.text(g, this.font, "für Minecraft 26.3", lx + 27, ly + 12, -10592654, false);
-      int bx = this.px + this.pw - 26;
-      int by = this.py + 9;
-      float hc = this.hover("close", in(mx, my, bx, by, 18, 18));
-      Glass.roundRect(g, bx, by, 18, 18, 6, Glass.lerpColor(285212671, Glass.withAlpha(-45730, 192), hc));
-      Glass.icon(g, Glass.ICON_CLOSE, bx + 6, by + 6, Glass.lerpColor(-6184523, -1, hc));
-      this.hit(bx, by, 18, 18, this::onClose);
-      boolean authorizing = s.status == DiscordState.Status.AUTHORIZING || s.status == DiscordState.Status.CONNECTING;
-      String label = s.status.label;
-      int w = Fx.width(this.font, label) + 18;
-      int sx = bx - 6 - w;
-      Glass.roundRect(g, sx, by + 3, w, 12, 6, Glass.withAlpha(s.status.color, 38));
-      Glass.roundOutline(g, sx, by + 3, w, 12, 6, Glass.withAlpha(s.status.color, 96));
-      int dc = authorizing ? Glass.alpha(s.status.color, 0.4F + 0.6F * Glass.pulse(800L)) : s.status.color;
-      if (s.status == DiscordState.Status.CONNECTED) {
-         Glass.glow(g, sx + 5, by + 7, 4, 4, 2, s.status.color, 2, Glass.pulse(1600L));
-      }
+   /* ================= Kopfzeile ================= */
 
-      Glass.dot(g, sx + 7, by + 9, 2, dc);
-      Fx.text(g, this.font, label, sx + 13, by + 5, -657926, false);
-      int lineY = this.py + 34;
-      Glass.roundGradientH(g, this.px + 10, lineY, this.pw - 20, 1, 0, 16777215, 822083583);
-   }
+   private void header(GuiGraphicsExtractor g, int mx, int my, DiscordState s) {
+      int x = px() + 8, y = py() + 8;
+      DeuRender.roundRect(g, x, y, 24, 24, 6, Ui.CARD);
+      Ui.iconCentered(g, Ui.I_CHAT, x + 12, y + 12, 14, Ui.GOLD);
 
-   private void renderSidebar(GuiGraphicsExtractor g, int mx, int my, DiscordState s) {
-      int sx = this.px + 8;
-      int sy = this.py + 42;
-      int sw = 106;
-      int itemH = 22;
-      int target = sy + this.tab.ordinal() * (itemH + 3);
-      if (this.tabY < 0.0F) {
-         this.tabY = target;
-      }
-
-      this.tabY = this.tabY + (target - this.tabY) * Math.min(1.0F, this.dt * 16.0F);
-      int ty = Math.round(this.tabY);
-      Glass.roundGradientH(g, sx, ty, sw, itemH, 6, Glass.withAlpha(0xFF2EFF7A, 85), Glass.withAlpha(0xFF2EFF7A, 8));
-      Glass.roundOutline(g, sx, ty, sw, itemH, 6, Glass.withAlpha(0xFF2EFF7A, 64));
-      Glass.glow(g, sx, ty + 6, 2, 10, 1, 0xFF2EFF7A, 3, 1.0F);
-      Glass.roundRect(g, sx, ty + 6, 2, 10, 1, 0xFF1FD35F);
-      int y = sy;
-
-      for (GlassScreen.Tab t : GlassScreen.Tab.values()) {
-         boolean sel = t == this.tab;
-         float h = this.hover("tab" + t, in(mx, my, sx, y, sw, itemH));
-         if (!sel && h > 0.0F) {
-            Glass.roundRect(g, sx, y, sw, itemH, 6, Glass.alpha(352321535, h));
-         }
-
-         int color = sel ? -1 : Glass.lerpColor(-6184523, -657926, h);
-         Glass.icon(g, t.icon, sx + 9, y + (itemH - t.icon.length) / 2, sel ? 0xFF1FD35F : Glass.lerpColor(-10592654, -6184523, h));
-         Fx.text(g, this.font, t.label, sx + 24 + Math.round(h * 2.0F), y + 7, color, false);
-         this.hit(sx, y, sw, itemH, () -> this.switchTab(t));
-         y += itemH + 3;
-      }
-
-      int uy = this.py + this.ph - 62;
-      if (s.status == DiscordState.Status.CONNECTED) {
-         Glass.card(g, sx, uy, sw, 24, 6, 0.0F);
-         Glass.avatar(g, this.font, sx + 5, uy + 5, 14, s.userId, s.userName, false);
-         Glass.dot(g, sx + 18, uy + 18, 3, -16382455);
-         Glass.dot(g, sx + 18, uy + 18, 2, -13904522);
-         Fx.text(g, this.font, Glass.ellipsize(this.font, s.userName, sw - 30), sx + 24, uy + 4, -657926, false);
-         String keys = GlassConfig.get().menuKey.describe();
-         Fx.text(g, this.font, Glass.ellipsize(this.font, keys, sw - 30), sx + 24, uy + 14, -10592654, false);
-      } else {
-         String keys = "Menü: " + GlassConfig.get().menuKey.describe();
-         Fx.text(g, this.font, Glass.ellipsize(this.font, keys, sw), sx + (sw - Math.min(sw, Fx.width(this.font, keys))) / 2, uy + 10, -10592654, false);
-      }
-
+      int right = px() + pw() - 8;
+      this.button(g, mx, my, right - 20, y + 2, 20, 20, Ui.I_CLOSE, "", Look.GHOST, true, this::onClose);
+      right -= 24;
       boolean running = DiscordClient.INSTANCE.isRunning();
-      int by = this.py + this.ph - 32;
-      this.bigButton(g, mx, my, "conn", sx, by, sw, 22, running ? "Trennen" : "Verbinden", Glass.ICON_PLUG, !running, running ? -45730 : 0xFF2EFF7A, () -> {
-         if (DiscordClient.INSTANCE.isRunning()) {
-            DiscordClient.INSTANCE.disconnect();
-         } else {
-            DiscordClient.INSTANCE.connect();
-         }
+      this.button(g, mx, my, right - 20, y + 2, 20, 20, Ui.I_POWER, "", running ? Look.ACCENT : Look.NORMAL, true, () -> {
+         if (DiscordClient.INSTANCE.isRunning()) DiscordClient.INSTANCE.disconnect();
+         else DiscordClient.INSTANCE.connect();
       });
+      right -= 28;
+      String[] labels = {"Call", "Text", "Einstellungen"};
+      for (int i = labels.length - 1; i >= 0; i--) {
+         GlassScreen.Page target = GlassScreen.Page.values()[i];
+         int bw = Ui.boldWidth(labels[i]) + 16;
+         this.button(g, mx, my, right - bw, y + 2, bw, 20, null, labels[i], this.page == target ? Look.ACCENT : Look.NORMAL, true, () -> this.show(target));
+         right -= bw + 4;
+      }
+
+      int tx = x + 31, room = right - tx - 2;
+      Ui.boldText(g, "Discord", tx, y + 3, Ui.TEXT);
+      DeuRender.roundRect(g, tx, y + 17, 5, 5, 2, s.status.color);
+      String state = s.status == DiscordState.Status.CONNECTED && !s.userName.isEmpty() ? s.userName : eu.deusmp.deucore.Tr.t(s.status.label);
+      this.userText(g, state, tx + 9, y + 15, room - 9, Ui.TEXT_DIM);
    }
 
-   private void heading(GuiGraphicsExtractor g, String title, String sub) {
-      Glass.bigText(g, this.font, title, this.cx(), this.cy() - 1, 1.25F, -1);
-      if (sub != null) {
-         Fx.text(g, this.font, Glass.ellipsize(this.font, sub, this.cw()), this.cx(), this.cy() + 12, -10592654, false);
+   private void show(GlassScreen.Page target) {
+      if (this.page != target) {
+         this.page = target;
+         lastPage = target;
+         this.capturing = null;
+         this.rebuildWidgets();
       }
    }
 
-   private void renderOverview(GuiGraphicsExtractor g, int mx, int my, DiscordState s) {
-      int cx = this.cx();
-      int cy = this.cy();
-      int cw = this.cw();
-      int ch = this.ch();
+   /* ================= Nicht verbunden ================= */
+
+   private void offline(GuiGraphicsExtractor g, int mx, int my, DiscordState s) {
+      int x = cx(), y = cy(), w = cw(), h = ch();
+      DeuRender.roundRect(g, x, y, w, h, 6, Ui.CARD);
+      String title = switch (s.status) {
+         case AUTHORIZING -> "Bestätige in Discord";
+         case CONNECTING -> "Verbinde mit Discord…";
+         case ERROR -> "Verbindung fehlgeschlagen";
+         case WAITING -> "Warte auf Discord…";
+         default -> "Nicht verbunden";
+      };
+      String detail = !s.statusDetail.isEmpty() ? s.statusDetail
+            : s.status == DiscordState.Status.AUTHORIZING ? "Klicke im Discord-Fenster auf \"Autorisieren\"."
+            : "Öffne die Discord-App auf diesem PC, mehr ist nicht nötig.";
+      int mid = y + h / 2;
+      Ui.iconCentered(g, "mod_headphones", x + w / 2, mid - 40, 28, Ui.TEXT_DIM);
+      Ui.centered(g, title, x + w / 2, mid - 16, Ui.TEXT);
+      int ly = mid - 2;
+      for (FormattedCharSequence line : this.font.split(FormattedText.of(eu.deusmp.deucore.Tr.t(detail), net.minecraft.network.chat.Style.EMPTY.withFont(Ui.uiFont())), w - 60)) {
+         g.text(this.font, line, x + w / 2 - this.font.width(line) / 2, ly, Ui.TEXT_DIM, false);
+         ly += 10;
+      }
+
+      if (!DiscordClient.INSTANCE.isRunning()) {
+         this.button(g, mx, my, x + w / 2 - 55, Math.min(ly + 8, y + h - 26), 110, 20, null, "Verbinden", Look.ACCENT, true, DiscordClient.INSTANCE::connect);
+      }
+   }
+
+   /* ================= Reiter: Call ================= */
+
+   private static String norm(String s) {
+      return Normalizer.normalize(s == null ? "" : s, Normalizer.Form.NFD).replaceAll("\\p{M}+", "").toLowerCase(Locale.ROOT).trim();
+   }
+
+   private void callTab(GuiGraphicsExtractor g, int mx, int my, DiscordState s) {
+      int x = cx(), y = cy(), h = ch(), lw = listW();
+      DeuRender.roundRect(g, x, y, lw, h, 6, Ui.CARD);
+      DiscordState.Guild guild = s.guilds.stream().filter(it -> it.id().equals(this.selectedGuild)).findFirst().orElse(null);
+      if (guild == null) this.overview(g, mx, my, s, false, x, y, lw, h);
+      else this.channelList(g, mx, my, s, guild, x, y, lw, h);
+      this.callPanel(g, mx, my, s, x + lw + 6, y, cw() - lw - 6, h);
+   }
+
+   /** Zeile der linken Liste: Ueberschrift, Hinweiszeile, Freund oder Server */
+   private record Entry(String heading, FormattedCharSequence hint, GlassConfig.Friend friend, DiscordState.Guild guild) {
+   }
+
+   /** Freunde und Server, in beiden Reitern gleich aufgebaut; ein Klick auf einen Freund ruft an bzw. oeffnet den Chat */
+   private void overview(GuiGraphicsExtractor g, int mx, int my, DiscordState s, boolean text, int x, int y, int w, int h) {
+      if (this.searchBox != null) {
+         this.drawField(g, this.searchBox, x + 4, y + 4, w - 8);
+      }
+
+      String q = norm(this.filter);
+      List<Entry> entries = new ArrayList<>();
+      List<GlassConfig.Friend> friends = GlassConfig.get().friends.stream().filter(f -> q.isEmpty() || norm(f.name).contains(q)).toList();
+      List<DiscordState.Guild> guilds = s.guilds.stream().filter(it -> q.isEmpty() || norm(it.name()).contains(q)).toList();
+      if (!friends.isEmpty() || q.isEmpty()) {
+         entries.add(new Entry("Freunde", null, null, null));
+         friends.forEach(f -> entries.add(new Entry(null, null, f, null)));
+         if (friends.isEmpty()) {
+            String hint = eu.deusmp.deucore.Tr.t("Noch keine. Klicke bei Personen im Call oder Chat auf den Stern.");
+            this.wrap(hint, w - 18).forEach(line -> entries.add(new Entry(null, line, null, null)));
+         }
+      }
+
+      if (!guilds.isEmpty()) {
+         entries.add(new Entry("Server", null, null, null));
+         guilds.forEach(it -> entries.add(new Entry(null, null, null, it)));
+      }
+
+      int top = y + 24, visible = Math.max(1, (y + h - 2 - top) / ROW);
+      int offset = Mth.clamp(text ? this.textListScroll : this.listScroll, 0, Math.max(0, entries.size() - visible));
+      if (text) this.textListScroll = offset;
+      else this.listScroll = offset;
+      this.scrolls.add(new Scroll(x, y, w, h, d -> {
+         if (text) this.textListScroll += d;
+         else this.listScroll += d;
+      }));
+      if (entries.isEmpty()) {
+         Ui.centered(g, s.guilds.isEmpty() ? "Lade Server…" : "Kein Treffer", x + w / 2, top + 8, Ui.TEXT_DIM);
+      }
+
+      for (int i = offset; i < Math.min(entries.size(), offset + visible); i++) {
+         Entry e = entries.get(i);
+         int ry = top + (i - offset) * ROW;
+         if (e.heading() != null) {
+            Ui.text(g, e.heading(), x + 8, ry + 7, Ui.TEXT_DIM);
+         } else if (e.hint() != null) {
+            g.text(this.font, e.hint(), x + 8, ry + 5, Ui.TEXT_DIM, false);
+         } else if (e.friend() != null) {
+            this.friendRow(g, mx, my, s, e.friend(), text, x, ry, w);
+         } else {
+            DiscordState.Guild it = e.guild();
+            boolean hover = in(mx, my, x + 4, ry, w - 10, ROW - 2);
+            if (hover) DeuRender.roundRect(g, x + 4, ry, w - 10, ROW - 2, 4, Ui.CARD_HOVER);
+            this.guildIcon(g, x + 8, ry + 2, it);
+            this.userText(g, it.name(), x + 27, ry + 5, w - 36, Ui.TEXT);
+            this.hit(x + 4, ry, w - 10, ROW - 2, () -> {
+               if (text) {
+                  this.textGuild = it.id();
+                  this.textListScroll = 0;
+               } else {
+                  this.selectedGuild = it.id();
+                  this.listScroll = 0;
+               }
+
+               DiscordClient.INSTANCE.loadChannels(it.id());
+            });
+         }
+      }
+
+      this.scrollbar(g, x + w - 4, top, visible * ROW - 2, entries.size(), visible, offset);
+   }
+
+   private void friendRow(GuiGraphicsExtractor g, int mx, int my, DiscordState s, GlassConfig.Friend f, boolean text, int x, int ry, int w) {
+      boolean hover = in(mx, my, x + 4, ry, w - 10, ROW - 2);
+      boolean active = text ? f.hasChat() ? f.id.equals(s.textChannelId) : s.textChannelId == null && f.userId.equals(this.friendWithoutChat)
+            : f.hasChat() && f.id.equals(s.channelId);
+      if (active) DeuRender.roundRect(g, x + 4, ry, w - 10, ROW - 2, 4, 0x402EFF7A);
+      else if (hover) DeuRender.roundRect(g, x + 4, ry, w - 10, ROW - 2, 4, Ui.CARD_HOVER);
+      Glass.avatar(g, this.font, x + 8, ry + 2, 14, f.userId.isEmpty() ? f.id : f.userId, f.name, false, f.icon);
+      this.userText(g, f.name, x + 27, ry + 5, w - (hover ? 72 : 36), active ? Ui.GOLD : Ui.TEXT);
+
+      Runnable call = f.hasChat() ? () -> this.call(f.id) : () -> DiscordClient.INSTANCE.openProfile(f.userId);
+      this.hit(x + 4, ry, w - 10, ROW - 2, !text ? call : f.hasChat() ? () -> this.openChat(f.id, f.name, null) : () -> {
+         DiscordClient.INSTANCE.closeText();
+         this.friendWithoutChat = f.userId;
+      });
+      if (hover) { // nach der Zeile angemeldet, haben deshalb Vorrang
+         this.smallButton(g, mx, my, x + w - 42, ry + 1, f.hasChat() ? "mod_call" : Ui.I_PERSON, Ui.TEXT,
+               f.hasChat() ? "Anrufen" : "Profil in Discord öffnen", call);
+         this.smallButton(g, mx, my, x + w - 24, ry + 1, Ui.I_CLOSE, Ui.TEXT_DIM, "Aus Freunden entfernen",
+               () -> GlassConfig.get().removeFriend(f));
+      }
+   }
+
+   private void smallButton(GuiGraphicsExtractor g, int mx, int my, int x, int y, String icon, int color, String help, Runnable action) {
+      boolean hover = in(mx, my, x, y, 16, 16);
+      DeuRender.roundRect(g, x, y, 16, 16, 4, hover ? 0xFF353A43 : 0xFF2A2E35);
+      Ui.iconCentered(g, icon, x + 8, y + 8, 10, color);
+      if (hover) this.tip = help;
+      this.hit(x, y, 16, 16, action);
+   }
+
+   /** Stern: Person aus Call oder Chat in die Freundesliste aufnehmen oder wieder entfernen */
+   private void star(GuiGraphicsExtractor g, int mx, int my, int x, int y, String userId, String name, String avatar) {
+      GlassConfig cfg = GlassConfig.get();
+      GlassConfig.Friend known = cfg.friendByUser(userId);
+      this.smallButton(g, mx, my, x, y, Ui.I_STAR, known != null ? Ui.GOLD : Ui.TEXT_DIM,
+            known != null ? "Aus Freunden entfernen" : "Als Freund merken", () -> {
+               if (known != null) cfg.removeFriend(known);
+               else cfg.rememberFriend("", userId, name, avatar, true);
+            });
+   }
+
+   /** Kopfzeile einer Kanalliste: zurueck zur Serverliste */
+   private void backRow(GuiGraphicsExtractor g, int mx, int my, DiscordState.Guild guild, int x, int y, int w, Runnable action) {
+      boolean back = in(mx, my, x + 4, y + 4, w - 8, 16);
+      DeuRender.roundRect(g, x + 4, y + 4, w - 8, 16, 4, back ? 0xFF353A43 : 0xFF2A2E35);
+      Ui.icon(g, Ui.I_CHEV_L, x + 9, y + 8, 8, Ui.TEXT_DIM);
+      this.userText(g, guild.name(), x + 22, y + 8, w - 30, Ui.TEXT);
+      this.hit(x + 4, y + 4, w - 8, 16, action);
+   }
+
+   private void channelList(GuiGraphicsExtractor g, int mx, int my, DiscordState s, DiscordState.Guild guild, int x, int y, int w, int h) {
+      this.backRow(g, mx, my, guild, x, y, w, () -> {
+         this.selectedGuild = null;
+         this.listScroll = 0;
+      });
+
+      List<DiscordState.Channel> channels = s.channelsByGuild.get(guild.id());
+      int top = y + 24, visible = Math.max(1, (y + h - 2 - top) / ROW);
+      if (channels == null || channels.isEmpty()) {
+         Ui.centered(g, channels == null ? "Lade Kanäle…" : "Keine Sprachkanäle", x + w / 2, top + 8, Ui.TEXT_DIM);
+         return;
+      }
+
+      this.listScroll = Mth.clamp(this.listScroll, 0, Math.max(0, channels.size() - visible));
+      this.scrolls.add(new Scroll(x, y, w, h, d -> this.listScroll += d));
+      for (int i = this.listScroll; i < Math.min(channels.size(), this.listScroll + visible); i++) {
+         DiscordState.Channel c = channels.get(i);
+         int ry = top + (i - this.listScroll) * ROW;
+         boolean current = c.id().equals(s.channelId);
+         boolean hover = in(mx, my, x + 4, ry, w - 10, ROW - 2);
+         if (current) DeuRender.roundRect(g, x + 4, ry, w - 10, ROW - 2, 4, 0x402EFF7A);
+         else if (hover) DeuRender.roundRect(g, x + 4, ry, w - 10, ROW - 2, 4, Ui.CARD_HOVER);
+         Ui.icon(g, "mod_volume", x + 9, ry + 4, 10, current ? Ui.GOLD : Ui.TEXT_DIM);
+         int room = w - 34;
+         if (hover && !current) {
+            int jw = Ui.width("Beitreten");
+            Ui.text(g, "Beitreten", x + w - 10 - jw, ry + 5, Ui.GOLD);
+            room -= jw + 6;
+         }
+
+         this.userText(g, c.name(), x + 24, ry + 5, room, current ? Ui.GOLD : Ui.TEXT);
+         if (!current) {
+            this.hit(x + 4, ry, w - 10, ROW - 2, () -> DiscordClient.INSTANCE.joinVoice(c.id()));
+         }
+      }
+
+      this.scrollbar(g, x + w - 4, top, visible * ROW - 2, channels.size(), visible, this.listScroll);
+   }
+
+   private void callPanel(GuiGraphicsExtractor g, int mx, int my, DiscordState s, int x, int y, int w, int h) {
       DiscordClient dc = DiscordClient.INSTANCE;
-      if (s.status != DiscordState.Status.CONNECTED) {
-         int h = 150;
-         int y = cy + (ch - h) / 2 - 6;
-         Glass.card(g, cx, y, cw, h, 10, 0.0F);
-         int ix = cx + cw / 2 - 16;
-         int iy = y + 14;
-         float p = s.status != DiscordState.Status.AUTHORIZING && s.status != DiscordState.Status.CONNECTING ? 0.5F : Glass.pulse(900L);
-         Glass.glow(g, ix, iy, 32, 32, 16, s.status.color, 6, 0.5F + 0.5F * p);
-         Glass.roundGradient(g, ix, iy, 32, 32, 16, Glass.withAlpha(s.status.color, 80), Glass.withAlpha(s.status.color, 24));
-         Glass.roundOutline(g, ix, iy, 32, 32, 16, Glass.withAlpha(s.status.color, 160));
-         Glass.icon(g, Glass.ICON_PLUG, ix + 12, iy + 11, -1);
+      DeuRender.roundRect(g, x, y, w, h, 6, Ui.CARD);
+      int bottom = y + h - 26;
+      if (!s.inCall()) {
+         int mid = y + (bottom - y) / 2;
+         Ui.iconCentered(g, "mod_volume", x + w / 2, mid - 18, 22, Ui.TEXT_DIM);
+         Ui.centered(g, "Kein Sprachkanal", x + w / 2, mid, Ui.TEXT);
+         Ui.centered(g, Ui.ellipsize("Wähle links einen Kanal.", w - 12), x + w / 2, mid + 12, Ui.TEXT_DIM);
+      } else {
+         String ping = s.ping >= 0 ? Math.round(s.ping) + " ms" : "";
+         String link = s.voiceConnection.isEmpty() || s.voiceConnection.equals("VOICE_CONNECTED") ? ""
+               : s.voiceConnection.replace("VOICE_", "").replace('_', ' ').toLowerCase(Locale.ROOT);
+         String info = link.isEmpty() ? ping : link;
+         int iw = info.isEmpty() ? 0 : Ui.width(info);
+         this.userText(g, s.channelName == null ? "" : s.channelName, x + 8, y + 6, w - 22 - iw, Ui.TEXT);
+         Ui.text(g, info, x + w - 8 - iw, y + 6, link.isEmpty() ? Ui.GOLD : 0xFFFFC14D);
+         this.userText(g, s.guildName == null ? "" : s.guildName, x + 8, y + 17, w - 16, Ui.TEXT_DIM);
 
-         String title = switch (s.status) {
-            case AUTHORIZING -> "Bestätige in Discord";
-            case CONNECTING -> "Verbinde mit Discord…";
-            case ERROR -> "Verbindung fehlgeschlagen";
-            case WAITING -> "Warte auf Discord…";
-            default -> "Nicht verbunden";
-         };
-         int tw = Math.round(Fx.width(this.font, title) * 1.25F);
-         Glass.bigText(g, this.font, title, cx + (cw - tw) / 2, iy + 40, 1.25F, -1);
-         String detail = !s.statusDetail.isEmpty()
-            ? s.statusDetail
-            : (
-               s.status == DiscordState.Status.AUTHORIZING
-                  ? "In Discord ist ein Fenster aufgegangen – klicke dort auf „Autorisieren“."
-                  : "Öffne die Discord-App auf diesem PC – die Mod verbindet sich automatisch. Keine Einrichtung nötig."
-            );
-         List<FormattedCharSequence> lines = this.font.split(FormattedText.of(detail), cw - 40);
-         int ly = iy + 56;
+         List<DiscordState.Member> members = s.members();
+         int top = y + 31, visible = Math.max(1, (bottom - 3 - top) / ROW);
+         this.memberScroll = Mth.clamp(this.memberScroll, 0, Math.max(0, members.size() - visible));
+         this.scrolls.add(new Scroll(x, y, w, h, d -> this.memberScroll += d));
+         for (int i = this.memberScroll; i < Math.min(members.size(), this.memberScroll + visible); i++) {
+            DiscordState.Member m = members.get(i);
+            int ry = top + (i - this.memberScroll) * ROW;
+            if (m.speaking) DeuRender.roundRect(g, x + 4, ry, w - 10, ROW - 2, 4, 0x262EFF7A);
+            Glass.avatar(g, this.font, x + 9, ry + 2, 14, m.id, m.name, m.speaking, m.avatar);
+            int rx = x + w - 10;
+            if (!m.id.equals(s.userId) && in(mx, my, x + 4, ry, w - 10, ROW - 2)) {
+               this.star(g, mx, my, rx - 17, ry + 1, m.id, m.name, m.avatar);
+               rx -= 21;
+            }
 
-         for (FormattedCharSequence line : lines) {
-            Fx.text(g, this.font, line, cx + (cw - Fx.width(this.font, line)) / 2, ly, -6184523, false);
+            if (m.deafened()) rx = this.offIcon(g, "mod_headphones-off", rx, ry + 3);
+            if (m.muted()) rx = this.offIcon(g, "mod_mic-off", rx, ry + 3);
+            String name = m.id.equals(s.userId) ? m.name + " (" + eu.deusmp.deucore.Tr.t("du") + ")" : m.name;
+            this.userText(g, name, x + 29, ry + 5, rx - (x + 29) - 4, m.muted() || m.deafened() ? Ui.TEXT_DIM : Ui.TEXT);
+         }
+
+         this.scrollbar(g, x + w - 4, top, visible * ROW - 2, members.size(), visible, this.memberScroll);
+      }
+
+      // Steuerleiste
+      int bw = (w - 16) / 3, by = y + h - 22;
+      this.control(g, mx, my, x + 4, by, bw, s.selfMute ? "mod_mic-off" : "mod_mic", s.selfMute ? "Stumm" : "Mikrofon", s.selfMute ? Look.DANGER : Look.NORMAL, true, dc::toggleMute);
+      this.control(g, mx, my, x + 8 + bw, by, bw, s.selfDeaf ? "mod_headphones-off" : "mod_headphones", s.selfDeaf ? "Taub" : "Ton", s.selfDeaf ? Look.DANGER : Look.NORMAL, true, dc::toggleDeafen);
+      this.control(g, mx, my, x + 12 + 2 * bw, by, w - 16 - 2 * bw, "mod_hangup", "Auflegen", Look.DANGER, s.inCall(), dc::leaveVoice);
+   }
+
+   /* ================= Reiter: Text ================= */
+
+   private void textTab(GuiGraphicsExtractor g, int mx, int my, DiscordState s) {
+      int x = cx(), y = cy(), h = ch(), lw = listW();
+      DeuRender.roundRect(g, x, y, lw, h, 6, Ui.CARD);
+      DiscordState.Guild guild = s.guilds.stream().filter(it -> it.id().equals(this.textGuild)).findFirst().orElse(null);
+      if (guild == null) this.overview(g, mx, my, s, true, x, y, lw, h);
+      else this.textChannels(g, mx, my, s, guild, x, y, lw, h);
+      this.messagePanel(g, mx, my, s, x + lw + 6, y, cw() - lw - 6, h);
+   }
+
+   private void textChannels(GuiGraphicsExtractor g, int mx, int my, DiscordState s, DiscordState.Guild guild, int x, int y, int w, int h) {
+      this.backRow(g, mx, my, guild, x, y, w, () -> {
+         this.textGuild = null;
+         this.textListScroll = 0;
+      });
+      List<DiscordState.Channel> channels = s.textByGuild.get(guild.id());
+      int top = y + 24, visible = Math.max(1, (y + h - 2 - top) / ROW);
+      if (channels == null || channels.isEmpty()) {
+         Ui.centered(g, channels == null ? "Lade Kanäle…" : "Keine Textkanäle", x + w / 2, top + 8, Ui.TEXT_DIM);
+         return;
+      }
+
+      this.textListScroll = Mth.clamp(this.textListScroll, 0, Math.max(0, channels.size() - visible));
+      this.scrolls.add(new Scroll(x, y, w, h, d -> this.textListScroll += d));
+      for (int i = this.textListScroll; i < Math.min(channels.size(), this.textListScroll + visible); i++) {
+         DiscordState.Channel c = channels.get(i);
+         int ry = top + (i - this.textListScroll) * ROW;
+         boolean open = c.id().equals(s.textChannelId);
+         boolean hover = in(mx, my, x + 4, ry, w - 10, ROW - 2);
+         if (open) DeuRender.roundRect(g, x + 4, ry, w - 10, ROW - 2, 4, 0x402EFF7A);
+         else if (hover) DeuRender.roundRect(g, x + 4, ry, w - 10, ROW - 2, 4, Ui.CARD_HOVER);
+         Ui.text(g, "#", x + 11, ry + 5, open ? Ui.GOLD : Ui.TEXT_DIM);
+         this.userText(g, c.name(), x + 24, ry + 5, w - 34, open ? Ui.GOLD : Ui.TEXT);
+         this.hit(x + 4, ry, w - 10, ROW - 2, () -> this.openChat(c.id(), c.name(), guild.id()));
+      }
+
+      this.scrollbar(g, x + w - 4, top, visible * ROW - 2, channels.size(), visible, this.textListScroll);
+   }
+
+   private void openChat(String id, String name, String guild) {
+      this.messageScroll = 0;
+      this.friendWithoutChat = null;
+      DiscordClient.INSTANCE.openText(id, name, guild);
+   }
+
+   /** Anruf in einer Direktnachricht: dem Sprachkanal der Unterhaltung beitreten */
+   private void call(String channelId) {
+      DiscordClient.INSTANCE.joinVoice(channelId);
+      this.show(GlassScreen.Page.CALL);
+   }
+
+   private static final java.time.format.DateTimeFormatter TIME = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+   private static final java.time.format.DateTimeFormatter DAY = java.time.format.DateTimeFormatter.ofPattern("dd.MM. HH:mm");
+
+   private static String time(long millis) {
+      java.time.ZonedDateTime t = java.time.Instant.ofEpochMilli(millis).atZone(java.time.ZoneId.systemDefault());
+      return (t.toLocalDate().equals(java.time.LocalDate.now()) ? TIME : DAY).format(t);
+   }
+
+   private void messagePanel(GuiGraphicsExtractor g, int mx, int my, DiscordState s, int x, int y, int w, int h) {
+      DeuRender.roundRect(g, x, y, w, h, 6, Ui.CARD);
+      String channel = s.textChannelId;
+      GlassConfig.Friend waiting = this.friendWithoutChat == null ? null : GlassConfig.get().friendByUser(this.friendWithoutChat);
+      if (channel == null && waiting != null) {
+         if (waiting.hasChat()) { // inzwischen kam eine Nachricht oder ein Anruf
+            this.openChat(waiting.id, waiting.name, null);
+         } else {
+            this.noChat(g, mx, my, waiting, x, y, w, h);
+         }
+
+         return;
+      }
+
+      if (channel == null) {
+         Ui.centered(g, Ui.ellipsize("Wähle links einen Kanal.", w - 12), x + w / 2, y + h / 2 - 12, Ui.TEXT);
+         int ly = y + h / 2 + 2;
+         for (FormattedCharSequence line : this.wrap(eu.deusmp.deucore.Tr.t("Freunde und Server stehen links. Zum Schreiben öffnet sich die Discord-App."), w - 40)) {
+            g.text(this.font, line, x + w / 2 - this.font.width(line) / 2, ly, Ui.TEXT_DIM, false);
             ly += 10;
          }
 
-         if (!dc.isRunning()) {
-            int bw = 96;
-            int gap = 6;
-            int bx = cx + (cw - bw * 2 - gap) / 2;
-            int by = y + h - 30;
-            this.bigButton(g, mx, my, "ov-conn", bx, by, bw, 20, "Verbinden", Glass.ICON_PLUG, true, 0xFF2EFF7A, dc::connect);
-            this.bigButton(
-               g, mx, my, "ov-set", bx + bw + gap, by, bw, 20, "Optionen", Glass.ICON_GEAR, false, 0xFF2EFF7A, () -> this.switchTab(GlassScreen.Tab.SETTINGS)
-            );
-         }
-      } else {
-         int heroH = 46;
-         Glass.roundGradientH(g, cx, cy, cw, heroH, 10, Glass.withAlpha(0xFF2EFF7A, 64), Glass.withAlpha(0xFF1FD35F, 16));
-         Glass.roundOutline(g, cx, cy, cw, heroH, 10, Glass.withAlpha(0xFF2EFF7A, 85));
-         int iconBox = 28;
-         int ibx = cx + 9;
-         int iby = cy + 9;
-         Glass.roundRect(g, ibx, iby, iconBox, iconBox, 8, 1073741824);
-         Glass.roundOutline(g, ibx, iby, iconBox, iconBox, 8, 822083583);
-         if (s.inCall()) {
-            Glass.icon(g, Glass.ICON_SPEAKER, ibx + 10, iby + 10, -13904522);
-            String name = s.channelName == null ? "" : s.channelName;
-            Glass.bigText(g, this.font, Glass.ellipsize(this.font, name, (int)((cw - 120) / 1.25F)), ibx + iconBox + 8, iby + 1, 1.25F, -1);
-            int sy2 = iby + 16;
-            int tx = ibx + iconBox + 8;
-            String guild = s.guildName == null ? "" : s.guildName;
-            Fx.text(g, this.font, Glass.ellipsize(this.font, guild, cw - 140), tx, sy2, -6184523, false);
-            int gx = tx + Math.min(Fx.width(this.font, guild), cw - 140) + 6;
-            Glass.signal(g, gx, sy2, s.ping);
-            if (s.ping >= 0.0F) {
-               Fx.text(g, this.font, Math.round(s.ping) + " ms", gx + 11, sy2, -10592654, false);
+         return;
+      }
+
+      boolean direct = s.textGuildId == null;
+      int room = w - 16;
+      if (direct) {
+         int bw = Ui.boldWidth("Anrufen") + 20;
+         this.button(g, mx, my, x + w - 4 - bw, y + 4, bw, 16, null, "Anrufen", Look.RAISED, true, () -> this.call(channel));
+         room -= bw;
+      }
+
+      this.userText(g, (direct ? "" : "# ") + s.textChannelName, x + 8, y + 8, room, Ui.TEXT);
+      this.button(g, mx, my, x + 4, y + h - 22, w - 8, 18, null, "In Discord schreiben", Look.ACCENT, true,
+            () -> DiscordClient.INSTANCE.openInDiscord(channel, s.textGuildId));
+
+      int top = y + 24, bottom = y + h - 26, view = bottom - top;
+      List<DiscordState.Message> messages = s.messages;
+      if (!s.textStatus.isEmpty() || messages.isEmpty()) {
+         Ui.centered(g, Ui.ellipsize(s.textStatus.isEmpty() ? "Keine Nachrichten" : s.textStatus, w - 12), x + w / 2, top + view / 2 - 4, Ui.TEXT_DIM);
+         return;
+      }
+
+      // aufeinanderfolgende Nachrichten derselben Person werden zusammengefasst
+      List<DiscordState.Message> list = List.copyOf(messages);
+      List<List<FormattedCharSequence>> lines = new ArrayList<>(list.size());
+      boolean[] head = new boolean[list.size()];
+      int total = 0;
+      for (int i = 0; i < list.size(); i++) {
+         DiscordState.Message m = list.get(i);
+         head[i] = i == 0 || !m.authorId().equals(list.get(i - 1).authorId()) || m.time() - list.get(i - 1).time() > 300_000L;
+         lines.add(this.wrap(DiscordState.readableText(m.text()), w - 36));
+         total += (head[i] ? 15 : 1) + lines.get(i).size() * 10;
+      }
+
+      int max = Math.max(0, total - view);
+      this.messageScroll = Mth.clamp(this.messageScroll, 0, max);
+      this.scrolls.add(new Scroll(x, top, w, view, d -> this.messageScroll -= d * 20));
+      int ly = max == 0 ? top : bottom - total + this.messageScroll;
+      g.enableScissor(x + 2, top, x + w - 2, bottom);
+      for (int i = 0; i < list.size(); i++) {
+         DiscordState.Message m = list.get(i);
+         int height = (head[i] ? 15 : 1) + lines.get(i).size() * 10;
+         if (ly + height > top && ly < bottom) {
+            int ty = ly + 1;
+            if (head[i]) {
+               ty = ly + 4;
+               Glass.avatar(g, this.font, x + 8, ty, 14, m.authorId(), m.author(), false, m.avatar());
+               String when = time(m.time());
+               int tw = Ui.width(when);
+               this.userText(g, m.author(), x + 28, ty, w - 44 - tw, Ui.GOLD);
+               int nameW = Math.min(Ui.rawWidth(m.author()), w - 44 - tw);
+               Ui.text(g, when, x + 32 + nameW, ty, Ui.TEXT_DIM);
+               // Stern neben dem Namen, solange die Maus auf der Nachricht liegt und er ganz sichtbar ist
+               if (!m.authorId().equals(s.userId) && ty - 4 >= top && ty + 12 <= bottom
+                     && in(mx, my, x + 4, ly, w - 8, height)) {
+                  this.star(g, mx, my, Math.min(x + w - 22, x + 36 + nameW + tw), ty - 4, m.authorId(), m.author(), m.avatar());
+               }
+
+               ty += 11;
             }
 
-            String conn = !s.voiceConnection.isEmpty() && !s.voiceConnection.equals("VOICE_CONNECTED")
-               ? s.voiceConnection.replace("VOICE_", "").replace("_", " ").toLowerCase()
-               : "Live";
-            int pc = conn.equals("Live") ? -13904522 : -16059;
-            Glass.pill(g, this.font, cx + cw - 9, cy + 9, (conn.equals("Live") ? "● " : "") + conn, pc);
-         } else {
-            Glass.icon(g, Glass.ICON_SPEAKER, ibx + 10, iby + 10, -10592654);
-            Glass.bigText(g, this.font, "Kein Sprachkanal", ibx + iconBox + 8, iby + 1, 1.25F, -1);
-            Fx.text(g, this.font, "Tritt einem Kanal bei, um ihn hier zu sehen.", ibx + iconBox + 8, iby + 16, -6184523, false);
-         }
-
-         int by = cy + heroH + 8;
-         int bw = (cw - 12) / 3;
-         this.bigButton(g, mx, my, "mute", cx, by, bw, 24, s.selfMute ? "Stumm" : "Mikrofon", Glass.ICON_MIC, s.selfMute, -45730, dc::toggleMute);
-         if (s.selfMute) {
-            Glass.slash(g, cx + 10, by + 6, 11, -1);
-         }
-
-         this.bigButton(g, mx, my, "deaf", cx + bw + 6, by, bw, 24, s.selfDeaf ? "Taub" : "Ton", Glass.ICON_HEADPHONES, s.selfDeaf, -45730, dc::toggleDeafen);
-         if (s.selfDeaf) {
-            Glass.slash(g, cx + bw + 16, by + 6, 11, -1);
-         }
-
-         if (s.inCall()) {
-            this.bigButton(g, mx, my, "leave", cx + 2 * (bw + 6), by, bw, 24, "Auflegen", Glass.ICON_HANGUP, true, -45730, dc::leaveVoice);
-         } else {
-            this.bigButton(
-               g,
-               mx,
-               my,
-               "pick",
-               cx + 2 * (bw + 6),
-               by,
-               bw,
-               24,
-               "Kanal wählen",
-               Glass.ICON_SERVER,
-               true,
-               0xFF2EFF7A,
-               () -> this.switchTab(GlassScreen.Tab.SERVERS)
-            );
-         }
-
-         int ly = by + 32;
-         int lh = cy + ch - ly;
-         Glass.card(g, cx, ly, cw, lh, 10, 0.0F);
-         if (!s.inCall()) {
-            List<FormattedCharSequence> lines = this.font
-               .split(
-                  FormattedText.of(
-                     "Sobald du in einem Call bist, siehst du hier alle Teilnehmer – wer gerade spricht, wer stumm oder taub geschaltet ist. Über „Kanal wählen“ kannst du direkt beitreten."
-                  ),
-                  cw - 24
-               );
-            int ty = ly + 12;
-
-            for (FormattedCharSequence line : lines) {
-               Fx.text(g, this.font, line, cx + 12, ty, -6184523, false);
+            for (FormattedCharSequence line : lines.get(i)) {
+               g.text(this.font, line, x + 28, ty, Ui.TEXT, false);
                ty += 10;
             }
-         } else {
-            List<DiscordState.Member> members = s.members();
-            long speaking = members.stream().filter(mxx -> mxx.speaking).count();
-            Fx.text(g, this.font, "IM CALL", cx + 10, ly + 7, -10592654, false);
-            Fx.text(g, this.font, String.valueOf(members.size()), cx + 10 + Fx.width(this.font, "IM CALL") + 4, ly + 7, 0xFF1FD35F, false);
-            if (speaking > 0L) {
-               Glass.pill(g, this.font, cx + cw - 8, ly + 5, speaking + " spricht", -13904522);
-            }
-
-            int rowH = 18;
-            int top = ly + 20;
-            int visible = Math.max(1, (lh - 24) / rowH);
-            this.memberScroll = Math.max(0, Math.min(this.memberScroll, members.size() - visible));
-            this.scrolls.add(new GlassScreen.Scroll(cx, ly, cw, lh, d -> this.memberScroll = this.memberScroll + d));
-            g.enableScissor(cx + 1, top - 1, cx + cw - 1, ly + lh - 3);
-            int ry = top;
-
-            for (int i = this.memberScroll; i < members.size() && i < this.memberScroll + visible; i++) {
-               DiscordState.Member m = members.get(i);
-               float h = this.hover("m" + m.id, in(mx, my, cx + 5, ry, cw - 10, rowH - 2));
-               float sp = this.anim("sp" + m.id, m.speaking, 10.0F);
-               Glass.roundRect(g, cx + 5, ry, cw - 10, rowH - 2, 6, Glass.lerpColor(Glass.alpha(285212671, h), Glass.withAlpha(-13904522, 34), sp));
-               if (sp > 0.01F) {
-                  Glass.roundOutline(g, cx + 5, ry, cw - 10, rowH - 2, 6, Glass.withAlpha(-13904522, (int)(96.0F * sp)));
-               }
-
-               Glass.avatar(g, this.font, cx + 10, ry + 1, 14, m.id, m.name, m.speaking);
-               int rx = cx + cw - 14;
-               if (m.deafened()) {
-                  rx = Glass.iconBadge(g, rx, ry + 3, Glass.ICON_HEADPHONES, -45730);
-               }
-
-               if (m.muted()) {
-                  rx = Glass.iconBadge(g, rx, ry + 3, Glass.ICON_MIC, -45730);
-               }
-
-               if (m.serverMute || m.serverDeaf) {
-                  rx = Glass.pill(g, this.font, rx, ry + 4, "Server", -45730);
-               }
-
-               boolean me = m.id.equals(s.userId);
-               String name = m.name;
-               int nameColor = m.speaking ? -1 : (!m.muted() && !m.deafened() ? -657926 : -10592654);
-               String shown = Glass.ellipsize(this.font, name, rx - (cx + 30) - (me ? 24 : 0));
-               Fx.text(g, this.font, shown, cx + 30, ry + 4, nameColor, false);
-               if (me) {
-                  Fx.text(g, this.font, "(du)", cx + 30 + Fx.width(this.font, shown) + 4, ry + 4, -10592654, false);
-               }
-
-               ry += rowH;
-            }
-
-            g.disableScissor();
-            this.scrollbar(g, cx + cw - 4, top, lh - 24, members.size(), visible, this.memberScroll);
          }
+
+         ly += height;
+      }
+
+      g.disableScissor();
+      if (max > 0) {
+         int bar = Math.max(12, view * view / total);
+         DeuRender.roundRect(g, x + w - 3, top + (view - bar) * (max - this.messageScroll) / max, 2, bar, 1, 0x55FFFFFF);
       }
    }
 
-   private void renderServers(GuiGraphicsExtractor g, int mx, int my, DiscordState s) {
-      this.heading(g, "Server", "Suche einen Server und klicke auf einen Sprachkanal.");
-      int cx = this.cx();
-      int cw = this.cw();
-      if (!DiscordClient.INSTANCE.isConnected()) {
-         if (this.guildBox != null) {
-            this.guildBox.visible = false;
-         }
-
-         if (this.channelBox != null) {
-            this.channelBox.visible = false;
-         }
-
-         this.emptyState(g, cx, this.cy() + 30, cw, this.ch() - 30, "Nicht mit Discord verbunden.");
-      } else {
-         int rw = Fx.width(this.font, "Aktualisieren") + 14;
-         if (this.guildBox != null) {
-            this.guildBox.visible = true;
-         }
-
-         this.smallButton(g, mx, my, "refresh", cx + cw - rw, this.cy() - 1, rw, 14, "Aktualisieren", () -> {
-            DiscordClient.INSTANCE.refreshGuilds();
-            if (this.selectedGuild != null) {
-               DiscordClient.INSTANCE.loadChannels(this.selectedGuild);
-            }
-         });
-         int top = this.cy() + 26;
-         int h = this.ch() - 26;
-         int lw = (cw - 6) / 2;
-         Glass.card(g, cx, top, lw, h, 10, 0.0F);
-         Glass.card(g, cx + lw + 6, top, cw - lw - 6, h, 10, 0.0F);
-         List<DiscordState.Guild> allGuilds = new ArrayList<>(s.guilds);
-         List<DiscordState.Guild> guilds = filter(allGuilds, this.guildFilter, DiscordState.Guild::name);
-         int rowH = 18;
-         int listTop = top + 22;
-         int visible = (h - 26) / rowH;
-         if (this.guildBox != null) {
-            this.searchBar(g, mx, my, this.guildBox, cx + 4, top + 4, lw - 8, "g");
-         }
-
-         this.guildScroll = Math.max(0, Math.min(this.guildScroll, guilds.size() - visible));
-         this.scrolls.add(new GlassScreen.Scroll(cx, top, lw, h, d -> this.guildScroll = this.guildScroll + d));
-         if (allGuilds.isEmpty()) {
-            Fx.text(g, this.font, "Lade Server…", cx + 10, listTop + 6, -10592654, false);
-         } else if (guilds.isEmpty()) {
-            String none = "Kein Server für „" + this.guildFilter.trim() + "“";
-            Fx.text(g, this.font, Glass.ellipsize(this.font, none, lw - 16), cx + 10, listTop + 6, -10592654, false);
-         } else if (!this.guildFilter.isBlank()) {
-            String cnt = guilds.size() + " von " + allGuilds.size();
-            Fx.text(g, this.font, cnt, cx + lw - Fx.width(this.font, cnt) - 8, top + h - 11, -10592654, false);
-         }
-
-         g.enableScissor(cx + 1, listTop - 1, cx + lw - 1, top + h - 12);
-         int ry = listTop;
-
-         for (int i = this.guildScroll; i < guilds.size() && i < this.guildScroll + visible + 1; i++) {
-            DiscordState.Guild gu = guilds.get(i);
-            boolean sel = gu.id().equals(this.selectedGuild);
-            float hv = this.hover("g" + gu.id(), in(mx, my, cx + 4, ry, lw - 8, rowH - 2));
-            if (sel) {
-               Glass.roundGradientH(g, cx + 4, ry, lw - 8, rowH - 2, 6, Glass.withAlpha(0xFF2EFF7A, 112), Glass.withAlpha(0xFF2EFF7A, 24));
-            } else if (hv > 0.0F) {
-               Glass.roundRect(g, cx + 4, ry, lw - 8, rowH - 2, 6, Glass.alpha(352321535, hv));
-            }
-
-            Glass.avatar(g, this.font, cx + 8, ry + 2, 12, gu.id(), gu.name(), false);
-            Fx.text(g, this.font, Glass.ellipsize(this.font, gu.name(), lw - 34), cx + 25, ry + 4, sel ? -1 : Glass.lerpColor(-6184523, -657926, hv), false);
-            this.hit(cx + 4, ry, lw - 8, rowH - 2, () -> {
-               this.selectedGuild = gu.id();
-               this.channelScroll = 0;
-               DiscordClient.INSTANCE.loadChannels(gu.id());
-            });
-            ry += rowH;
-         }
-
-         g.disableScissor();
-         this.scrollbar(g, cx + lw - 4, listTop, h - 26, guilds.size(), visible, this.guildScroll);
-         int kx = cx + lw + 6;
-         int kw = cw - lw - 6;
-         if (this.channelBox != null) {
-            this.channelBox.visible = this.selectedGuild != null;
-         }
-
-         if (this.selectedGuild == null) {
-            this.emptyState(g, kx, top, kw, h, "← Wähle einen Server");
-         } else {
-            this.searchBar(g, mx, my, this.channelBox, kx + 4, top + 4, kw - 8, "c");
-            List<DiscordState.Channel> allChannels = s.channelsByGuild.get(this.selectedGuild);
-            if (allChannels != null && !allChannels.isEmpty()) {
-               List<DiscordState.Channel> channels = filter(allChannels, this.channelFilter, DiscordState.Channel::name);
-               if (channels.isEmpty()) {
-                  String none = "Kein Kanal für „" + this.channelFilter.trim() + "“";
-                  Fx.text(g, this.font, Glass.ellipsize(this.font, none, kw - 16), kx + 10, listTop + 6, -10592654, false);
-               } else {
-                  this.channelScroll = Math.max(0, Math.min(this.channelScroll, channels.size() - visible));
-                  this.scrolls.add(new GlassScreen.Scroll(kx, top, kw, h, d -> this.channelScroll = this.channelScroll + d));
-                  g.enableScissor(kx + 1, listTop - 1, kx + kw - 1, top + h - 3);
-                  ry = listTop;
-
-                  for (int i = this.channelScroll; i < channels.size() && i < this.channelScroll + visible + 1; i++) {
-                     DiscordState.Channel c = channels.get(i);
-                     boolean current = c.id().equals(s.channelId);
-                     float hv = this.hover("c" + c.id(), in(mx, my, kx + 4, ry, kw - 8, rowH - 2));
-                     if (current) {
-                        Glass.roundRect(g, kx + 4, ry, kw - 8, rowH - 2, 6, Glass.withAlpha(-13904522, 48));
-                        Glass.roundOutline(g, kx + 4, ry, kw - 8, rowH - 2, 6, Glass.withAlpha(-13904522, 112));
-                     } else if (hv > 0.0F) {
-                        Glass.roundRect(g, kx + 4, ry, kw - 8, rowH - 2, 6, Glass.alpha(352321535, hv));
-                     }
-
-                     Glass.icon(g, Glass.ICON_SPEAKER, kx + 9, ry + 4, current ? -13904522 : Glass.lerpColor(-10592654, -6184523, hv));
-                     int right = kx + kw - 10;
-                     if (current) {
-                        right = Glass.pill(g, this.font, right, ry + 3, "Live", -13904522);
-                     } else if (hv > 0.05F) {
-                        right = Glass.pill(g, this.font, right, ry + 3, "Beitreten", 0xFF2EFF7A);
-                     }
-
-                     g.text(
-                        this.font,
-                        Glass.ellipsize(this.font, c.name(), right - (kx + 22) - 2),
-                        kx + 22,
-                        ry + 4,
-                        current ? -1 : Glass.lerpColor(-6184523, -657926, hv),
-                        false
-                     );
-                     if (!current) {
-                        this.hit(kx + 4, ry, kw - 8, rowH - 2, () -> DiscordClient.INSTANCE.joinVoice(c.id()));
-                     }
-
-                     ry += rowH;
-                  }
-
-                  g.disableScissor();
-                  this.scrollbar(g, kx + kw - 4, listTop, h - 26, channels.size(), visible, this.channelScroll);
-               }
-            } else {
-               Fx.text(g, this.font, allChannels == null ? "Lade Kanäle…" : "Keine Sprachkanäle", kx + 10, listTop + 6, -10592654, false);
-            }
-         }
+   /** Rechte Seite fuer eine Person, zu der noch kein Chat bekannt ist */
+   private void noChat(GuiGraphicsExtractor g, int mx, int my, GlassConfig.Friend f, int x, int y, int w, int h) {
+      int mid = y + h / 2;
+      Glass.avatar(g, this.font, x + w / 2 - 14, mid - 52, 28, f.userId, f.name, false, f.icon);
+      int nameW = Math.min(Ui.rawWidth(f.name), w - 16);
+      this.userText(g, f.name, x + (w - nameW) / 2, mid - 18, w - 16, Ui.TEXT);
+      int ly = mid - 4;
+      for (FormattedCharSequence line : this.wrap(eu.deusmp.deucore.Tr.t("Der Chat erscheint hier, sobald eine Nachricht oder ein Anruf von dieser Person kommt."), w - 40)) {
+         g.text(this.font, line, x + w / 2 - this.font.width(line) / 2, ly, Ui.TEXT_DIM, false);
+         ly += 10;
       }
+
+      this.button(g, mx, my, x + 4, y + h - 22, w - 8, 18, null, "Profil in Discord öffnen", Look.ACCENT, true,
+            () -> DiscordClient.INSTANCE.openProfile(f.userId));
    }
 
-   private void renderHotkeys(GuiGraphicsExtractor g, int mx, int my) {
-      this.heading(g, "Hotkeys", "Linksklick: belegen  •  Rechtsklick: entfernen");
+   private List<FormattedCharSequence> wrap(String text, int width) {
+      return this.font.split(FormattedText.of(text, net.minecraft.network.chat.Style.EMPTY.withFont(Ui.uiFont())), width);
+   }
+
+   /* ================= Reiter: Einstellungen ================= */
+
+   private void settingsTab(GuiGraphicsExtractor g, int mx, int my) {
       GlassConfig cfg = GlassConfig.get();
-      int cx = this.cx();
-      int cw = this.cw();
-      Object[][] rows = new Object[][]{
-         {"Menü öffnen", "Dieses Menü ein-/ausblenden", cfg.menuKey, Glass.ICON_WAVE},
-         {"Stummschalten", "Mikrofon an/aus", cfg.muteKey, Glass.ICON_MIC},
-         {"Taubschalten", "Ton & Mikrofon an/aus", cfg.deafenKey, Glass.ICON_HEADPHONES},
-         {"HUD ein/aus", "Overlay ingame zeigen", cfg.hudKey, Glass.ICON_SERVER},
-         {"Call verlassen", "Aktuellen Sprachkanal verlassen", cfg.leaveKey, Glass.ICON_HANGUP}
-      };
-      int y = this.cy() + 26;
-      int rowH = 32;
+      int y = cy(), h = ch(), w = (cw() - 6) / 2;
+      int lx = cx(), rx = cx() + w + 6;
+      DeuRender.roundRect(g, lx, y, w, h, 6, Ui.CARD);
+      DeuRender.roundRect(g, rx, y, cw() - w - 6, h, 6, Ui.CARD);
 
-      for (Object[] row : rows) {
-         Hotkey hk = (Hotkey)row[2];
-         boolean cap = this.capturing == hk;
-         float hv = this.hover("hk" + row[0], in(mx, my, cx, y, cw, rowH - 4));
-         Glass.card(g, cx, y, cw, rowH - 4, 8, hv * 0.6F);
-         Glass.roundRect(g, cx + 6, y + 5, 18, 18, 6, Glass.withAlpha(0xFF2EFF7A, 48));
-         String[] icon = (String[])row[3];
-         Glass.icon(g, icon, cx + 6 + (18 - Glass.iconW(icon)) / 2, y + 5 + (18 - icon.length) / 2, 0xFF1FD35F);
-         Fx.text(g, this.font, (String)row[0], cx + 30, y + 5, -657926, false);
-         Fx.text(g, this.font, (String)row[1], cx + 30, y + 15, -10592654, false);
-         String label = cap ? "Drücke Tasten…" : hk.describe();
-         int kw = Math.max(70, Fx.width(this.font, label) + 16);
-         int kx = cx + cw - kw - 6;
-         int ky = y + 5;
-         float kh = this.hover("key" + row[0], in(mx, my, kx, ky, kw, 18));
-         if (cap) {
-            float p = Glass.pulse(700L);
-            Glass.glow(g, kx, ky, kw, 18, 5, 0xFF2EFF7A, 4, 0.5F + 0.5F * p);
-            Glass.roundRect(g, kx, ky, kw, 18, 5, Glass.withAlpha(0xFF2EFF7A, 96));
-            Glass.roundOutline(g, kx, ky, kw, 18, 5, 0xFF2EFF7A);
-         } else {
-            Glass.roundRect(g, kx, ky + 2, kw, 16, 5, -16777216);
-            Glass.roundGradient(g, kx, ky, kw, 16, 5, Glass.lerpColor(-14408658, -13619140, kh), Glass.lerpColor(-15263970, -14671830, kh));
-            Glass.roundOutline(g, kx, ky, kw, 16, 5, Glass.lerpColor(822083583, Glass.withAlpha(0xFF2EFF7A, 192), kh));
-         }
-
-         int tc = !hk.isBound() && !cap ? -10592654 : -1;
-         Fx.text(g, this.font, label, kx + (kw - Fx.width(this.font, label)) / 2, ky + (cap ? 5 : 4), tc, false);
-         this.hits.add(new GlassScreen.Hit(kx, ky, kw, 18, () -> this.capturing = cap ? null : hk, () -> {
-            if (hk != cfg.menuKey) {
-               hk.key = -1;
-               hk.ctrl = hk.shift = hk.alt = false;
-               GlassConfig.save();
-            }
-
-            this.capturing = null;
-         }));
-         y += rowH;
-      }
-   }
-
-   private void renderSettings(GuiGraphicsExtractor g, int mx, int my) {
-      GlassConfig cfg = GlassConfig.get();
-      int cx = this.cx();
-      int cw = this.cw();
-      int y = this.cy();
-      this.section(g, "VERBINDUNG", cx, y);
-      this.toggleRow(g, mx, my, cx, y + 11, cw, "Eigene Discord-App verwenden (Profi-Modus)", cfg.useOwnApp, () -> {
+      // links: Overlay und Verbindung
+      Column left = new Column(g, mx, my, lx, y, w, h, this.leftScroll);
+      left.heading("Overlay");
+      left.toggle("Call-HUD anzeigen", cfg.hudEnabled, () -> cfg.hudEnabled = !cfg.hudEnabled);
+      left.toggle("Nur sprechende Mitglieder", cfg.hudOnlySpeaking, () -> cfg.hudOnlySpeaking = !cfg.hudOnlySpeaking);
+      left.toggle("Benachrichtigungen", cfg.notifications, () -> cfg.notifications = !cfg.notifications);
+      String[] corners = {"Oben links", "Oben rechts", "Unten links", "Unten rechts"};
+      left.value("Position", corners[Math.floorMod(cfg.hudCorner, 4)], () -> cfg.hudCorner = (cfg.hudCorner + 1) % 4);
+      left.action("Größe und Hintergrund", this::openAppearance);
+      left.heading("Verbindung");
+      left.toggle("Automatisch verbinden", cfg.autoConnect, () -> cfg.autoConnect = !cfg.autoConnect);
+      left.toggle("Eigene Discord-App", cfg.useOwnApp, () -> {
          cfg.useOwnApp = !cfg.useOwnApp;
          GlassConfig.save();
          this.rebuildWidgets();
          DiscordClient.INSTANCE.disconnect();
          DiscordClient.INSTANCE.connect();
       });
-      if (!cfg.useOwnApp) {
-         int iy = y + 31;
-         Glass.roundGradientH(g, cx, iy, cw, 36, 7, Glass.withAlpha(-13904522, 48), Glass.withAlpha(-13904522, 8));
-         Glass.roundOutline(g, cx, iy, cw, 36, 7, Glass.withAlpha(-13904522, 96));
-         Glass.roundRect(g, cx + 7, iy + 9, 18, 18, 6, Glass.withAlpha(-13904522, 80));
-         Glass.icon(g, Glass.ICON_CHECK, cx + 13, iy + 15, -1);
-         Fx.text(g, this.font, "Ohne Einrichtung – verbindet sich automatisch", cx + 32, iy + 8, -657926, false);
-         Fx.text(g, this.font, Glass.ellipsize(this.font, "Einmal in Discord auf „Autorisieren“ klicken, fertig.", cw - 40), cx + 32, iy + 20, -6184523, false);
+      if (cfg.useOwnApp) {
+         left.field(this.idBox);
+         left.field(this.secretBox);
+         left.hint("Redirect: http://localhost");
+         left.toggle("Rich Presence", cfg.richPresence, () -> cfg.richPresence = !cfg.richPresence);
       }
 
-      String[] labels = new String[]{"App-ID", "Secret"};
-      EditBox[] boxes = new EditBox[]{this.idBox, this.secretBox};
+      left.action("Anmeldung zurücksetzen", DiscordClient.INSTANCE::forgetLogin);
+      this.leftScroll = left.finish(d -> this.leftScroll += d);
 
-      for (int i = 0; i < 2 && cfg.useOwnApp; i++) {
-         EditBox b = boxes[i];
-         int fy = y + 31 + i * 20;
-         Fx.text(g, this.font, labels[i], cx + 2, fy + 4, -6184523, false);
-         if (b != null) {
-            int bx = b.getX() - 6;
-            int bw = b.getWidth() + 12;
-            float f = this.anim("f" + i, b.isFocused(), 12.0F);
-            if (f > 0.01F) {
-               Glass.glow(g, bx, fy, bw, 16, 5, 0xFF2EFF7A, 3, f);
-            }
+      // rechts: Tasten
+      Column right = new Column(g, mx, my, rx, y, cw() - w - 6, h, this.rightScroll);
+      right.heading("Tasten");
+      right.key("Menü öffnen", cfg.menuKey, false);
+      right.key("Stummschalten", cfg.muteKey, true);
+      right.key("Taubschalten", cfg.deafenKey, true);
+      right.key("HUD ein/aus", cfg.hudKey, true);
+      right.key("Call verlassen", cfg.leaveKey, true);
+      right.hint("Rechtsklick entfernt eine Taste.");
+      this.rightScroll = right.finish(d -> this.rightScroll += d);
+   }
 
-            Glass.roundRect(g, bx, fy, bw, 16, 5, Glass.lerpColor(1610612736, -1879048192, f));
-            Glass.roundOutline(g, bx, fy, bw, 16, 5, Glass.lerpColor(620756991, 0xFF2EFF7A, f));
+   private void openAppearance() {
+      Features.all(p -> p).stream().filter(f -> f.id().equals("discordglass")).findFirst()
+            .ifPresent(f -> this.minecraft.gui.setScreen(new FeatureSettingsScreen(this, f)));
+   }
+
+   /** Eine scrollbare Spalte der Einstellungen: Zeilen werden von oben nach unten angelegt */
+   private final class Column {
+      private final GuiGraphicsExtractor g;
+      private final int mx, my, x, top, w, h, offset;
+      private int y;
+
+      Column(GuiGraphicsExtractor g, int mx, int my, int x, int top, int w, int h, int offset) {
+         this.g = g;
+         this.mx = mx;
+         this.my = my;
+         this.x = x;
+         this.top = top;
+         this.w = w;
+         this.h = h;
+         this.offset = offset;
+         this.y = top + 5 - offset;
+         g.enableScissor(x, top + 2, x + w, top + h - 2);
+      }
+
+      /** true, wenn die Zeile ganz sichtbar ist (nur dann ist sie anklickbar) */
+      private boolean inside(int height) {
+         return this.y >= this.top + 1 && this.y + height <= this.top + this.h - 1;
+      }
+
+      private boolean row(int height) {
+         boolean hover = this.inside(height) && in(this.mx, this.my, this.x + 4, this.y, this.w - 8, height);
+         DeuRender.roundRect(this.g, this.x + 4, this.y, this.w - 8, height, 4, hover ? Ui.FIELD_HOVER : Ui.FIELD);
+         return hover;
+      }
+
+      private void click(int height, Runnable action) {
+         if (this.inside(height)) {
+            GlassScreen.this.hit(this.x + 4, this.y, this.w - 8, height, () -> {
+               action.run();
+               GlassConfig.save();
+            });
          }
       }
 
-      y += 76;
-      this.section(g, "OPTIONEN", cx, y);
-      y += 11;
-      int colW = (cw - 6) / 2;
-      this.toggleRow(g, mx, my, cx, y, colW, "Auto-Verbinden", cfg.autoConnect, () -> cfg.autoConnect = !cfg.autoConnect);
-      this.toggleRow(g, mx, my, cx + colW + 6, y, colW, "Rich Presence", cfg.richPresence, () -> cfg.richPresence = !cfg.richPresence);
-      y += 20;
-      this.toggleRow(g, mx, my, cx, y, colW, "HUD anzeigen", cfg.hudEnabled, () -> cfg.hudEnabled = !cfg.hudEnabled);
-      this.toggleRow(g, mx, my, cx + colW + 6, y, colW, "Nur Sprechende", cfg.hudOnlySpeaking, () -> cfg.hudOnlySpeaking = !cfg.hudOnlySpeaking);
-      y += 20;
-      this.toggleRow(g, mx, my, cx, y, colW, "Benachrichtigungen", cfg.notifications, () -> cfg.notifications = !cfg.notifications);
-      String[] corners = new String[]{"Oben links", "Oben rechts", "Unten links", "Unten rechts"};
-      int px2 = cx + colW + 6;
-      float hv = this.hover("corner", in(mx, my, px2, y, colW, 17));
-      Glass.card(g, px2, y, colW, 17, 6, hv);
-      Fx.text(g, this.font, "HUD", px2 + 7, y + 5, -6184523, false);
-      String c = corners[Math.floorMod(cfg.hudCorner, 4)] + " ›";
-      Fx.text(g, this.font, c, px2 + colW - Fx.width(this.font, c) - 7, y + 5, 0xFF1FD35F, false);
-      this.hit(px2, y, colW, 17, () -> {
-         cfg.hudCorner = (cfg.hudCorner + 1) % 4;
-         GlassConfig.save();
-      });
-      y += 20;
-      Glass.card(g, cx, y, cw, 17, 6, 0.0F);
-      Fx.text(g, this.font, "HUD-Deckkraft", cx + 7, y + 5, -6184523, false);
-      String pct = cfg.hudOpacity + "%";
-      Fx.text(g, this.font, pct, cx + cw - Fx.width(this.font, pct) - 7, y + 5, -657926, false);
-      int sx = cx + 90;
-      int sw = cw - 90 - 36;
-      int sy = y + 7;
-      Glass.roundRect(g, sx, sy, sw, 3, 1, 822083583);
-      float frac = (cfg.hudOpacity - 20) / 80.0F;
-      Glass.roundGradientH(g, sx, sy, Math.max(2, Math.round(sw * frac)), 3, 1, 0xFF2EFF7A, 0xFF1FD35F);
-      int kx = sx + Math.round(sw * frac);
-      Glass.glow(g, kx - 4, sy - 3, 9, 9, 4, 0xFF2EFF7A, 2, 1.0F);
-      Glass.roundRect(g, kx - 4, sy - 3, 9, 9, 4, -1);
-      this.slider = new GlassScreen.Hit(sx - 4, y, sw + 8, 17, () -> {
-         double rel = (this.lastMouseX - sx) / sw;
-         cfg.hudOpacity = (int)Math.round(Math.max(0.0, Math.min(1.0, rel)) * 8.0) * 10 + 20;
-         GlassConfig.save();
-      }, null);
-      this.hits.add(this.slider);
-      y += 24;
-      this.bigButton(g, mx, my, "forget", cx, y, (cw - 6) / 2, 20, "Login zurücksetzen", Glass.ICON_CLOSE, false, -45730, DiscordClient.INSTANCE::forgetLogin);
-      this.bigButton(g, mx, my, "reconnect", cx + (cw - 6) / 2 + 6, y, cw - (cw - 6) / 2 - 6, 20, "Neu verbinden", Glass.ICON_PLUG, true, 0xFF2EFF7A, () -> {
-         DiscordClient.INSTANCE.disconnect();
-         DiscordClient.INSTANCE.connect();
-      });
-      y += 26;
-      String help = cfg.useOwnApp
-         ? "Eigene App: discord.com/developers → App erstellen → OAuth2-Redirect „http://localhost“ → ID + Secret eintragen."
-         : "Die Anmeldung läuft über Discords StreamKit-Overlay. Rich Presence („Spielt Minecraft“) gibt es nur mit eigener App.";
+      void heading(String text) {
+         Ui.headingText(this.g, text, this.x + 8, this.y + 2, Ui.TEXT);
+         this.y += 15;
+      }
 
-      for (FormattedCharSequence line : this.font.split(FormattedText.of(help), cw)) {
-         if (y > this.py + this.ph - 14) {
-            break;
+      void toggle(String label, boolean on, Runnable flip) {
+         this.row(18);
+         Ui.text(this.g, Ui.ellipsize(label, this.w - 48), this.x + 10, this.y + 5, Ui.TEXT);
+         int tx = this.x + this.w - 32;
+         DeuRender.roundRect(this.g, tx, this.y + 4, 22, 10, 5, on ? Ui.ACCENT : 0xFF3A3F48);
+         DeuRender.roundRect(this.g, on ? tx + 13 : tx + 1, this.y + 5, 8, 8, 4, on ? 0xFF0A0D0F : 0xFFB6BCC6);
+         this.click(18, flip);
+         this.y += 20;
+      }
+
+      void value(String label, String value, Runnable next) {
+         this.row(18);
+         int vw = Ui.width(value);
+         Ui.text(this.g, Ui.ellipsize(label, this.w - 30 - vw), this.x + 10, this.y + 5, Ui.TEXT);
+         Ui.text(this.g, value, this.x + this.w - 10 - vw, this.y + 5, Ui.GOLD);
+         this.click(18, next);
+         this.y += 20;
+      }
+
+      void action(String label, Runnable action) {
+         boolean hover = this.inside(18) && in(this.mx, this.my, this.x + 4, this.y, this.w - 8, 18);
+         DeuRender.roundRect(this.g, this.x + 4, this.y, this.w - 8, 18, 4, hover ? 0xFF353A43 : 0xFF2A2E35);
+         Ui.centered(this.g, Ui.ellipsize(label, this.w - 16), this.x + this.w / 2, this.y + 5, Ui.TEXT);
+         this.click(18, action);
+         this.y += 20;
+      }
+
+      void field(EditBox box) {
+         if (box != null && this.inside(16)) {
+            GlassScreen.this.drawField(this.g, box, this.x + 4, this.y, this.w - 8);
          }
 
-         Fx.text(g, this.font, line, cx, y, -10592654, false);
-         y += 10;
+         this.y += 18;
+      }
+
+      void hint(String text) {
+         Ui.text(this.g, Ui.ellipsize(text, this.w - 16), this.x + 8, this.y + 2, Ui.TEXT_DIM);
+         this.y += 14;
+      }
+
+      void key(String label, Hotkey key, boolean removable) {
+         this.row(18);
+         boolean cap = GlassScreen.this.capturing == key;
+         String text = cap ? eu.deusmp.deucore.Tr.t("Taste drücken…") : key.describe();
+         int kw = Math.max(54, Ui.width(text) + 12), kx = this.x + this.w - 6 - kw;
+         Ui.text(this.g, Ui.ellipsize(label, kx - this.x - 14), this.x + 10, this.y + 5, Ui.TEXT);
+         DeuRender.roundRect(this.g, kx, this.y + 2, kw, 14, 3, cap ? Ui.ACCENT : 0xFF2A2E35);
+         Ui.centered(this.g, text, kx + kw / 2, this.y + 5, cap ? 0xFF0A0D0F : key.isBound() ? Ui.TEXT : Ui.TEXT_DIM);
+         if (this.inside(18)) {
+            GlassScreen.this.hits.add(new Hit(this.x + 4, this.y, this.w - 8, 18, () -> GlassScreen.this.capturing = cap ? null : key, () -> {
+               if (removable) {
+                  key.key = -1;
+                  key.ctrl = key.shift = key.alt = false;
+                  GlassConfig.save();
+               }
+
+               GlassScreen.this.capturing = null;
+            }));
+         }
+
+         this.y += 20;
+      }
+
+      /** Schliesst die Spalte ab und liefert den auf den Inhalt begrenzten Scroll-Stand */
+      int finish(Consumer<Integer> scrollBy) {
+         this.g.disableScissor();
+         int content = this.y + this.offset - this.top + 3;
+         int max = Math.max(0, content - this.h);
+         if (max > 0) {
+            GlassScreen.this.scrolls.add(new Scroll(this.x, this.top, this.w, this.h, d -> scrollBy.accept(d * 20)));
+            int bar = Math.max(16, (this.h - 8) * this.h / content);
+            DeuRender.roundRect(this.g, this.x + this.w - 3, this.top + 4 + (this.h - 8 - bar) * Math.min(this.offset, max) / max, 2, bar, 1, 0x55FFFFFF);
+         }
+
+         return Mth.clamp(this.offset, 0, max);
       }
    }
 
-   private void section(GuiGraphicsExtractor g, String text, int x, int y) {
-      Fx.text(g, this.font, text, x, y, -10592654, false);
-      int lx = x + Fx.width(this.font, text) + 6;
-      Glass.roundGradientH(g, lx, y + 4, this.cx() + this.cw() - lx, 1, 0, 822083583, 16777215);
+   /* ================= Bausteine ================= */
+
+   private enum Look { NORMAL, ACCENT, DANGER, GHOST, RAISED }
+
+   private void button(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, int h, String icon, String label, Look look, boolean active, Runnable action) {
+      boolean hover = active && in(mx, my, x, y, w, h);
+      int bg = switch (look) {
+         case ACCENT -> hover ? Ui.ACCENT_HOVER : Ui.ACCENT;
+         case DANGER -> hover ? 0x80B4303F : 0x33C0394B;
+         case GHOST -> hover ? 0x16FFFFFF : 0;
+         case RAISED -> hover ? 0xFF353A43 : 0xFF2A2E35; // hebt sich von der Karte ab
+         default -> hover ? Ui.FIELD_HOVER : Ui.FIELD;
+      };
+      int color = !active ? 0xFF5C6270 : look == Look.ACCENT ? 0xFF0A0D0F : look == Look.DANGER ? RED : Ui.TEXT;
+      if (!label.isEmpty()) {
+         Ui.boldButton(g, label, x, y, w, h, 4, bg, color);
+      } else {
+         if (bg != 0) DeuRender.roundRect(g, x, y, w, h, 4, bg);
+         if (icon != null) Ui.iconCentered(g, icon, x + w / 2, y + h / 2, 10, color);
+      }
+
+      if (active) this.hit(x, y, w, h, action);
    }
 
-   private void emptyState(GuiGraphicsExtractor g, int x, int y, int w, int h, String text) {
-      Fx.text(g, this.font, text, x + (w - Fx.width(this.font, text)) / 2, y + h / 2 - 4, -10592654, false);
+   /** Knopf der Steuerleiste: Symbol und, wenn Platz ist, Beschriftung */
+   private void control(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, String icon, String label, Look look, boolean active, Runnable action) {
+      if (look == Look.NORMAL) DeuRender.roundRect(g, x, y, w, 18, 4, 0xFF2A2E35); // hebt sich von der Karte ab
+      this.button(g, mx, my, x, y, w, 18, null, "", look == Look.NORMAL ? Look.GHOST : look, active, action);
+      int color = !active ? 0xFF5C6270 : look == Look.DANGER ? RED : Ui.TEXT;
+      int tw = Ui.width(label);
+      boolean text = tw + 20 <= w;
+      int sx = x + (w - (text ? 15 + tw : 10)) / 2;
+      Ui.icon(g, icon, sx, y + 4, 10, color);
+      if (text) Ui.text(g, label, sx + 15, y + 5, color);
+   }
+
+   /** Rotes, durchgestrichenes Symbol rechtsbuendig; liefert die neue rechte Kante */
+   private int offIcon(GuiGraphicsExtractor g, String icon, int right, int y) {
+      Ui.icon(g, icon, right - 10, y + 1, 10, RED);
+      return right - 15;
+   }
+
+   private void guildIcon(GuiGraphicsExtractor g, int x, int y, DiscordState.Guild guild) {
+      DiscordClient.INSTANCE.loadGuildIcon(guild.id());
+      Glass.avatar(g, this.font, x, y, 14, guild.id(), guild.name(), false, DiscordClient.INSTANCE.state.guildIcons.get(guild.id()));
+   }
+
+   /** Namen aus Discord: nicht uebersetzen, nur auf die Breite kuerzen */
+   private void userText(GuiGraphicsExtractor g, String text, int x, int y, int maxW, int color) {
+      if (text == null || maxW <= 4) return;
+      String shown = text;
+      if (Ui.rawWidth(shown) > maxW) {
+         while (shown.length() > 1 && Ui.rawWidth(shown + "…") > maxW) shown = shown.substring(0, shown.offsetByCodePoints(shown.length(), -1));
+         shown += "…";
+      }
+
+      g.text(this.font, Ui.raw(shown), x, y, color, false);
    }
 
    private void scrollbar(GuiGraphicsExtractor g, int x, int y, int h, int total, int visible, int offset) {
       if (total > visible) {
-         int th = Math.max(12, h * visible / total);
-         int ty = y + (h - th) * offset / Math.max(1, total - visible);
-         Glass.roundRect(g, x, y, 2, h, 1, 352321535);
-         Glass.roundRect(g, x, ty, 2, th, 1, Glass.withAlpha(0xFF2EFF7A, 192));
+         int bar = Math.max(12, h * visible / total);
+         DeuRender.roundRect(g, x, y + (h - bar) * offset / (total - visible), 2, bar, 1, 0x55FFFFFF);
       }
-   }
-
-   private void toggleRow(GuiGraphicsExtractor g, int mx, int my, int x, int y, int w, String label, boolean value, Runnable flip) {
-      float hv = this.hover("t" + label, in(mx, my, x, y, w, 17));
-      float on = this.anim("tg" + label, value, 14.0F);
-      Glass.card(g, x, y, w, 17, 6, hv);
-      Fx.text(g, this.font, Glass.ellipsize(this.font, label, w - 36), x + 7, y + 5, Glass.lerpColor(-6184523, -657926, Math.max(hv, on)), false);
-      int tx = x + w - 28;
-      int ty = y + 3;
-      int track = Glass.lerpColor(822083583, 0xFF2EFF7A, on);
-      if (on > 0.05F) {
-         Glass.glow(g, tx, ty, 22, 11, 5, 0xFF2EFF7A, 3, on);
-      }
-
-      Glass.roundRect(g, tx, ty, 22, 11, 5, track);
-      int kx = tx + 1 + Math.round(on * 11.0F);
-      Glass.roundRect(g, kx, ty + 1, 9, 9, 4, -1);
-      this.hit(x, y, w, 17, () -> {
-         flip.run();
-         GlassConfig.save();
-      });
-   }
-
-   private void bigButton(
-      GuiGraphicsExtractor g, int mx, int my, String id, int x, int y, int w, int h, String label, String[] icon, boolean active, int color, Runnable action
-   ) {
-      float hv = this.hover("b" + id, in(mx, my, x, y, w, h));
-      float ac = this.anim("a" + id, active, 12.0F);
-      if (ac > 0.01F) {
-         Glass.glow(g, x, y, w, h, 7, color, 4, ac * (0.6F + 0.4F * hv));
-         Glass.roundGradient(
-            g, x, y, w, h, 7, Glass.alpha(Glass.lerpColor(color, -1, 0.12F + 0.1F * hv), ac), Glass.alpha(Glass.lerpColor(color, -16777216, 0.25F), ac)
-         );
-      }
-
-      if (ac < 0.99F) {
-         Glass.roundRect(g, x, y, w, h, 7, Glass.alpha(Glass.lerpColor(318767103, 620756991, hv), 1.0F - ac));
-      }
-
-      Glass.roundOutline(g, x, y, w, h, 7, Glass.lerpColor(Glass.lerpColor(587202559, 1358954495, hv), 1358954495, ac));
-      g.fill(x + 7, y + 1, x + w - 7, y + 2, 553648127);
-      int iw = icon == null ? 0 : Glass.iconW(icon) + 5;
-      String text = Glass.ellipsize(this.font, label, w - 10 - iw);
-      int total = iw + Fx.width(this.font, text);
-      int sx = x + (w - total) / 2;
-      if (icon != null) {
-         Glass.icon(g, icon, sx, y + (h - icon.length) / 2, -1);
-      }
-
-      Fx.text(g, this.font, text, sx + iw, y + (h - 8) / 2 + 1, -1, false);
-      this.hit(x, y, w, h, action);
-   }
-
-   private void smallButton(GuiGraphicsExtractor g, int mx, int my, String id, int x, int y, int w, int h, String label, Runnable action) {
-      float hv = this.hover("s" + id, in(mx, my, x, y, w, h));
-      Glass.roundRect(g, x, y, w, h, 5, Glass.lerpColor(318767103, Glass.withAlpha(0xFF2EFF7A, 128), hv));
-      Glass.roundOutline(g, x, y, w, h, 5, Glass.lerpColor(620756991, 0xFF2EFF7A, hv));
-      Fx.text(g, this.font, label, x + (w - Fx.width(this.font, label)) / 2, y + (h - 8) / 2 + 1, -657926, false);
-      this.hit(x, y, w, h, action);
    }
 
    private void hit(int x, int y, int w, int h, Runnable action) {
-      this.hits.add(new GlassScreen.Hit(x, y, w, h, action, null));
+      this.hits.add(new Hit(x, y, w, h, action, null));
    }
 
    private static boolean in(double mx, double my, int x, int y, int w, int h) {
       return mx >= x && my >= y && mx < x + w && my < y + h;
    }
 
+   /* ================= Eingaben ================= */
+
+   @Override
    public boolean mouseClicked(MouseButtonEvent e, boolean doubleClick) {
-      this.lastMouseX = e.x();
-      if (super.mouseClicked(e, doubleClick)) {
-         return true;
-      } else {
-         for (EditBox b : new EditBox[]{this.idBox, this.secretBox, this.redirectBox, this.guildBox, this.channelBox}) {
-            if (b != null) {
-               b.setFocused(false);
-            }
-         }
-
-         this.setFocused(null);
-         boolean right = e.button() == 3;
-         boolean left = e.button() == 1;
-
-         for (int i = this.hits.size() - 1; i >= 0; i--) {
-            GlassScreen.Hit h = this.hits.get(i);
-            if (h.contains(e.x(), e.y())) {
-               Runnable r = right ? h.right() : (left ? h.left() : null);
-               if (r != null) {
-                  r.run();
-                  return true;
-               }
-            }
-         }
-
-         this.capturing = null;
-         return false;
+      if (super.mouseClicked(e, doubleClick)) return true;
+      for (EditBox b : new EditBox[]{this.searchBox, this.idBox, this.secretBox}) {
+         if (b != null) b.setFocused(false);
       }
-   }
 
-   public boolean mouseDragged(MouseButtonEvent e, double dx, double dy) {
-      if (this.tab == GlassScreen.Tab.SETTINGS && e.button() == 1) {
-         this.lastMouseX = e.x();
-         GlassScreen.Hit sl = this.slider;
-         if (sl != null && sl.contains(e.x(), e.y())) {
-            sl.left().run();
-            return true;
+      this.setFocused(null);
+      for (int i = this.hits.size() - 1; i >= 0; i--) {
+         Hit h = this.hits.get(i);
+         if (in(e.x(), e.y(), h.x(), h.y(), h.w(), h.h())) {
+            Runnable r = e.button() == InputConstants.MOUSE_BUTTON_LEFT ? h.left()
+                  : e.button() == InputConstants.MOUSE_BUTTON_RIGHT ? h.right() : null;
+            if (r != null) {
+               AbstractWidget.playButtonClickSound(this.minecraft.getSoundManager());
+               r.run();
+               return true;
+            }
          }
       }
 
-      return super.mouseDragged(e, dx, dy);
+      this.capturing = null;
+      return false;
    }
 
+   @Override
    public boolean mouseScrolled(double mx, double my, double sx, double sy) {
-      for (GlassScreen.Scroll a : this.scrolls) {
-         if (mx >= a.x() && my >= a.y() && mx < a.x() + a.w() && my < a.y() + a.h()) {
-            a.by().accept(sy > 0.0 ? -1 : (sy < 0.0 ? 1 : 0));
+      for (Scroll a : this.scrolls) {
+         if (sy != 0 && in(mx, my, a.x(), a.y(), a.w(), a.h())) {
+            a.by().accept(sy > 0 ? -1 : 1);
             return true;
          }
       }
@@ -1012,54 +960,35 @@ public class GlassScreen extends Screen {
       return super.mouseScrolled(mx, my, sx, sy);
    }
 
+   @Override
    public boolean keyPressed(KeyEvent e) {
       if (this.capturing != null) {
          if (e.isEscape()) {
             this.capturing = null;
-            return true;
-         } else if (Hotkey.isModifierKey(e.key())) {
-            return true;
-         } else {
+         } else if (!Hotkey.isModifierKey(e.key())) {
             this.capturing.key = e.key();
             this.capturing.ctrl = e.hasControlDown();
             this.capturing.shift = e.hasShiftDown();
             this.capturing.alt = e.hasAltDown();
             this.capturing = null;
             GlassConfig.save();
-            return true;
          }
-      } else {
-         boolean typing = this.getFocused() instanceof EditBox;
-         if (!typing && GlassConfig.get().menuKey.matches(e.key(), e.hasControlDown(), e.hasShiftDown(), e.hasAltDown())) {
-            this.onClose();
-            return true;
-         } else {
-            return super.keyPressed(e);
-         }
+
+         return true;
       }
+
+      boolean typing = this.getFocused() instanceof EditBox;
+      if (!typing && GlassConfig.get().menuKey.matches(e.key(), e.hasControlDown(), e.hasShiftDown(), e.hasAltDown())) {
+         this.onClose();
+         return true;
+      }
+
+      return super.keyPressed(e);
    }
 
    private record Hit(int x, int y, int w, int h, Runnable left, Runnable right) {
-      boolean contains(double mx, double my) {
-         return mx >= this.x && my >= this.y && mx < this.x + this.w && my < this.y + this.h;
-      }
    }
 
    private record Scroll(int x, int y, int w, int h, Consumer<Integer> by) {
-   }
-
-   private static enum Tab {
-      OVERVIEW("Übersicht", Glass.ICON_WAVE),
-      SERVERS("Server", Glass.ICON_SERVER),
-      HOTKEYS("Hotkeys", Glass.ICON_KEYBOARD),
-      SETTINGS("Einstellungen", Glass.ICON_GEAR);
-
-      final String label;
-      final String[] icon;
-
-      private Tab(String label, String[] icon) {
-         this.label = label;
-         this.icon = icon;
-      }
    }
 }

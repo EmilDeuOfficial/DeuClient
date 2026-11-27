@@ -9,6 +9,7 @@ import type { Instance, InstanceStats, NewInstanceInput, ScreenshotInfo, WorldIn
 import { normalizeLegacyInstance } from '../util/migrate';
 import { defaultProfileDir, paths } from '../util/paths';
 import { readJson, writeJson } from '../util/store';
+import { readWorldSummary } from './worlds';
 
 /** Standard-Instanz (Fabric, DeuCore und Glass-Mods) */
 export const DEFAULT_INSTANCE_ID = 'deusmp';
@@ -130,7 +131,7 @@ function backupContent(inst: Instance) {
   if (fs.existsSync(mods) && fs.readdirSync(mods).length) {
     fs.renameSync(mods, path.join(dir, `mods_backup_${inst.mcVersion}_${Date.now()}`));
   }
-  for (const f of ['deu-content.json', 'deu-managed.json']) fs.rmSync(path.join(dir, f), { force: true });
+  for (const f of ['deu-content.json', 'deu-managed.json', 'deu-preinstalled.json']) fs.rmSync(path.join(dir, f), { force: true });
   fs.mkdirSync(mods, { recursive: true });
 }
 
@@ -168,15 +169,27 @@ export function listWorlds(id: string): WorldInfo[] {
     .map((d) => {
       const dir = path.join(saves, d.name);
       const iconFile = path.join(dir, 'icon.png');
+      const info = readWorldSummary(dir);
       return {
         folder: d.name,
-        name: d.name,
-        lastPlayed: fs.statSync(path.join(dir, 'level.dat')).mtimeMs,
+        name: info.name || d.name,
+        gameMode: info.gameMode,
+        hardcore: info.hardcore,
+        lastPlayed: info.lastPlayed ?? fs.statSync(path.join(dir, 'level.dat')).mtimeMs,
         sizeMb: Math.round((dirSize(dir) / 1024 / 1024) * 10) / 10,
         icon: fs.existsSync(iconFile) ? `data:image/png;base64,${fs.readFileSync(iconFile).toString('base64')}` : undefined,
       };
     })
     .sort((a, b) => b.lastPlayed - a.lastPlayed);
+}
+
+/** Ordner einer Welt; nur direkte Unterordner von saves mit level.dat */
+export function worldDir(id: string, folder: string): string {
+  const dir = path.join(instanceDir(id), 'saves', path.basename(folder));
+  if (path.basename(folder) !== folder || folder === '..' || !fs.existsSync(path.join(dir, 'level.dat'))) {
+    throw new Error('Welt nicht gefunden');
+  }
+  return dir;
 }
 
 export function listScreenshots(id: string, limit = 24): ScreenshotInfo[] {

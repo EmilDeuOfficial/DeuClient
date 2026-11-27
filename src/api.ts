@@ -5,7 +5,7 @@
 import type {
   AccountsState, ContentType, EventMap, GameState, InstalledContent, InstallResult, Instance, JavaInstall,
   LaunchOptions, McVersion, ModrinthCategory, ModrinthProject, ModrinthSearchParams, ModrinthSearchResult,
-  ModrinthVersion, NewInstanceInput, Settings, UpdateStatus, SystemInfo, WorldInfo, ScreenshotInfo, InstanceStats, ServerConfig, ServerRuntime, NewServerInput, ServerAddresses, CustomCape, EquippedCosmetics,
+  ModrinthVersion, NewInstanceInput, Settings, UpdateStatus, SystemInfo, WorldInfo, WorldSettings, ScreenshotInfo, InstanceStats, ServerConfig, ServerRuntime, NewServerInput, ServerAddresses, CustomCape, EquippedCosmetics,
 } from '../shared/types';
 
 declare global {
@@ -61,6 +61,9 @@ export const api = {
     remove: (id: string) => inv<void>('instances:delete', id),
     openFolder: (id: string, sub?: string) => inv<void>('instances:openFolder', id, sub),
     worlds: (id: string) => inv<WorldInfo[]>('instances:worlds', id),
+    worldSettings: (id: string, folder: string) => inv<WorldSettings>('instances:worldSettings', id, folder),
+    saveWorld: (id: string, folder: string, value: WorldSettings) => inv<void>('instances:saveWorld', id, folder, value),
+    deleteWorld: (id: string, folder: string) => inv<void>('instances:deleteWorld', id, folder),
     screenshots: (id: string) => inv<ScreenshotInfo[]>('instances:screenshots', id),
     openScreenshot: (id: string, file: string) => inv<void>('instances:openScreenshot', id, file),
     stats: (id: string) => inv<InstanceStats>('instances:stats', id),

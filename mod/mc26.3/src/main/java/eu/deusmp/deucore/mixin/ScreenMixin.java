@@ -52,8 +52,8 @@ public abstract class ScreenMixin {
                 // clean: verschwommenes Welt-Panorama + dunkler, gruener Schleier
                 extractPanorama(g, delta);
                 extractBlurredBackground(g);
-                g.fillGradient(0, 0, this.width, this.height, 0xA00A0F0C, 0xC8050806);
-                g.fillGradient(0, 0, this.width, this.height / 2, 0x220B2014, 0x00000000);
+                g.fillGradient(0, 0, this.width, this.height, 0xA0121418, 0xC807080A);
+                g.fillGradient(0, 0, this.width, this.height / 2, 0x2212151A, 0x00000000);
             } else {
                 DeuRender.menuBackground(g, this.width, this.height, 255);
             }
@@ -62,8 +62,8 @@ public abstract class ScreenMixin {
         } else {
             // in der Welt: Welt verschwommen + gruener Schleier (wie im Hauptmenue)
             extractBlurredBackground(g);
-            g.fillGradient(0, 0, this.width, this.height, 0x8C0A1A10, 0xB4050806);
-            g.fillGradient(0, 0, this.width, this.height / 2, 0x300B2014, 0x00000000);
+            g.fillGradient(0, 0, this.width, this.height, 0x8C0C0D10, 0xB407080A);
+            g.fillGradient(0, 0, this.width, this.height / 2, 0x3012151A, 0x00000000);
         }
         this.minecraft.gui.hud.extractDeferredSubtitles();
         ci.cancel();
@@ -77,7 +77,7 @@ public abstract class ScreenMixin {
     }
 
     private void deucore$tint(GuiGraphicsExtractor g, int x, int y, int w, int h) {
-        g.fillGradient(x, y, x + w, y + h, 0x8C0A1A10, 0xB4050806);
+        g.fillGradient(x, y, x + w, y + h, 0x8C0C0D10, 0xB407080A);
     }
 
     /** Menues in der Welt (ohne eigenen Hintergrund): Blur + gruener Schleier */

@@ -37,7 +37,7 @@ public abstract class LevelLoadingScreenMixin {
         int n = view.radius() * 2 + 1;
         int side = n * stride - spacing;
         int x0 = cx - side / 2, y0 = cy - side / 2;
-        DeuRender.roundRect(g, x0 - 7, y0 - 7, side + 14, side + 14, 6, 0xE60A0F0C);
+        DeuRender.roundRect(g, x0 - 7, y0 - 7, side + 14, side + 14, 6, 0xE6121418);
         DeuRender.roundOutline(g, x0 - 7, y0 - 7, side + 14, side + 14, 6, 0x502EFF7A);
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
@@ -45,7 +45,7 @@ public abstract class LevelLoadingScreenMixin {
                 int c = COLORS.getInt(status);
                 float l = (((c >> 16) & 255) * 0.3f + ((c >> 8) & 255) * 0.59f + (c & 255) * 0.11f) / 255f;
                 float t = Math.max(0f, Math.min(1f, (l - 0.15f) / 0.7f));
-                int color = DeuRender.lerpArgb(0xFF16201A, 0xFF2EFF7A, t);
+                int color = DeuRender.lerpArgb(0xFF1C1F24, 0xFF2EFF7A, t);
                 DeuRender.roundRect(g, x0 + i * stride, y0 + j * stride, cell, cell, 1, color);
             }
         }

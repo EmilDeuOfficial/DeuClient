@@ -2,12 +2,11 @@
   <!-- Seitenbild des Setup-Installers (Willkommens- und Abschlussseite) -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#0e2818"/>
-      <stop offset="0.6" stop-color="#08150c"/>
-      <stop offset="1" stop-color="#050706"/>
+      <stop offset="0" stop-color="#35373c"/>
+      <stop offset="1" stop-color="#232428"/>
     </linearGradient>
     <radialGradient id="glow" cx="0.5" cy="0.32" r="0.5">
-      <stop offset="0" stop-color="#2eff7a" stop-opacity="0.35"/>
+      <stop offset="0" stop-color="#2eff7a" stop-opacity="0.12"/>
       <stop offset="1" stop-color="#2eff7a" stop-opacity="0"/>
     </radialGradient>
     <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
@@ -17,7 +16,7 @@
     </linearGradient>
     <linearGradient id="core" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#6bff9e"/>
-      <stop offset="1" stop-color="#0b2014"/>
+      <stop offset="1" stop-color="#1e1f22"/>
     </linearGradient>
   </defs>
   <rect width="164" height="314" fill="url(#bg)"/>
@@ -27,11 +26,6 @@
     <polygon points="256,128 362,234 256,374 150,234" fill="url(#core)"/>
     <path d="M256 168 Q263 222 316 234 Q263 246 256 302 Q249 246 196 234 Q249 222 256 168 Z" fill="#e6fff0"/>
   </g>
-  <text x="82" y="214" text-anchor="middle" font-family="Segoe UI" font-weight="bold" font-size="20" letter-spacing="2" fill="url(#gold)">DEUCLIENT</text>
+  <text x="82" y="214" text-anchor="middle" font-family="Segoe UI" font-weight="bold" font-size="20" letter-spacing="2" fill="#e8e9ec">DEUCLIENT</text>
   <rect x="42" y="232" width="80" height="2" rx="1" fill="#2eff7a" opacity="0.6"/>
-  <g fill="#9fffc0">
-    <rect x="20" y="300" width="2" height="2" opacity="0.8"/><rect x="140" y="120" width="2" height="2" opacity="0.7"/>
-    <rect x="30" y="150" width="2" height="2" opacity="0.6"/><rect x="128" y="290" width="3" height="3" opacity="0.8"/>
-    <rect x="12" y="40" width="2" height="2" opacity="0.5"/><rect x="150" y="30" width="2" height="2" opacity="0.6"/>
-  </g>
 </svg>

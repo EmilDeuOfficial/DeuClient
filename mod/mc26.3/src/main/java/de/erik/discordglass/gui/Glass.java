@@ -59,6 +59,10 @@ public final class Glass {
 
    public static int lerpColor(int a, int b, float t) {
       t = Math.max(0.0F, Math.min(1.0F, t));
+      if (eu.deusmp.deucore.Theme.mixed(a, b)) {
+         a = eu.deusmp.deucore.Theme.c(a);
+         b = eu.deusmp.deucore.Theme.c(b);
+      }
       int aa = a >>> 24 & 0xFF;
       int ar = a >> 16 & 0xFF;
       int ag = a >> 8 & 0xFF;
@@ -98,13 +102,6 @@ public final class Glass {
       return icon[0].length();
    }
 
-   public static void slash(GuiGraphicsExtractor g, int x, int y, int size, int color) {
-      for (int i = 0; i < size; i++) {
-         g.fill(x + i, y + i, x + i + 2, y + i + 1, -16777216);
-         g.fill(x + i, y + i, x + i + 1, y + i + 1, color);
-      }
-   }
-
    public static void dot(GuiGraphicsExtractor g, int cx, int cy, int r, int color) {
       roundRect(g, cx - r, cy - r, r * 2, r * 2, r, color);
    }
@@ -112,20 +109,25 @@ public final class Glass {
 
 
    public static void avatar(GuiGraphicsExtractor g, Font font, int x, int y, int size, String id, String name, boolean speaking) {
+      avatar(g, font, x, y, size, id, name, speaking, null);
+   }
+
+   /** Mit Bild von Discord; ohne (oder solange es laedt) der Anfangsbuchstabe */
+   public static void avatar(GuiGraphicsExtractor g, Font font, int x, int y, int size, String id, String name, boolean speaking, String url) {
       int hv = id == null ? 0 : id.hashCode() * -1640531535;
       hv ^= hv >>> 15;
-      int hue = Math.floorMod(hv, 360);
-      int c1 = 0xFF000000 | hsv(hue / 360.0F, 0.65F, 0.95F);
-      int c2 = 0xFF000000 | hsv((hue + 40) % 360 / 360.0F, 0.75F, 0.55F);
+      int color = 0xFF000000 | hsv(Math.floorMod(hv, 360) / 360.0F, 0.45F, 0.62F);
       if (speaking) {
-         float p = pulse(900L);
-         glow(g, x, y, size, size, size / 2, -13904522, 3, 0.6F + 0.4F * p);
-         roundRect(g, x - 1, y - 1, size + 2, size + 2, (size + 2) / 2, -13904522);
+         roundRect(g, x - 1, y - 1, size + 2, size + 2, (size + 2) / 2, 0xFF2EFF7A);
       }
 
-      roundGradient(g, x, y, size, size, size / 2, c1, c2);
+      if (DiscordImages.draw(g, url, x, y, size)) {
+         return;
+      }
+
+      roundRect(g, x, y, size, size, size / 2, color);
       String ini = name != null && !name.isEmpty() ? name.substring(0, name.offsetByCodePoints(0, 1)).toUpperCase() : "?";
-      Fx.text(g, font, ini, x + (size - Fx.width(font, ini)) / 2 + 1, y + (size - 8) / 2 + 1, -1, true);
+      g.text(font, eu.deusmp.deucore.screen.Ui.raw(ini), x + (size - eu.deusmp.deucore.screen.Ui.rawWidth(ini) + 1) / 2, y + (size - 8) / 2, -1, false);
    }
 
    public static int hsv(float h, float s, float v) {
@@ -175,41 +177,44 @@ public final class Glass {
    public static int pill(GuiGraphicsExtractor g, Font font, int rightX, int y, String text, int color) {
       int w = Fx.width(font, text) + 8;
       roundRect(g, rightX - w, y, w, 11, 5, withAlpha(color, 56));
-      roundOutline(g, rightX - w, y, w, 11, 5, withAlpha(color, 112));
       Fx.text(g, font, text, rightX - w + 4, y + 2, lerpColor(color, -1, 0.35F), false);
       return rightX - w - 3;
    }
 
-   public static int iconBadge(GuiGraphicsExtractor g, int rightX, int y, String[] icon, int color) {
-      int w = iconW(icon);
-      icon(g, icon, rightX - w, y, color);
-      slash(g, rightX - w - 1, y - 1, Math.max(w, icon.length) + 1, color);
-      return rightX - w - 4;
+   /** Kantenlaenge der Symbole im Overlay: nur wenig hoeher als die Grossbuchstaben daneben */
+   public static final int HUD_ICON = 8;
+
+   /** Symbol im Overlay, mittig zur Textzeile, die bei textY beginnt */
+   public static void hudIcon(GuiGraphicsExtractor g, String name, int x, int textY, int color) {
+      g.pose().pushMatrix();
+      g.pose().translate(0.0F, 0.5F);
+      eu.deusmp.deucore.screen.Ui.iconCentered(g, name, x + HUD_ICON / 2, textY + HUD_ICON / 2, HUD_ICON, color);
+      g.pose().popMatrix();
    }
 
-   public static void signal(GuiGraphicsExtractor g, int x, int y, float ping) {
-      int bars = ping < 0.0F ? 0 : (ping < 80.0F ? 3 : (ping < 160.0F ? 2 : 1));
-      int color = bars == 3 ? -13904522 : (bars == 2 ? -16059 : -45730);
+   public static int iconBadge(GuiGraphicsExtractor g, int rightX, int textY, String[] icon, int color) {
+      offIcon(g, icon, rightX - HUD_ICON, textY, color);
+      return rightX - HUD_ICON - 3;
+   }
 
-      for (int i = 0; i < 3; i++) {
-         int h = 3 + i * 2;
-         g.fill(x + i * 3, y + 7 - h, x + i * 3 + 2, y + 7, i < bars ? color : 822083583);
-      }
+   /** Mikrofon oder Kopfhoerer durchgestrichen (eigenes glattes Symbol) */
+   public static void offIcon(GuiGraphicsExtractor g, String[] icon, int x, int textY, int color) {
+      hudIcon(g, icon == ICON_MIC ? "mod_mic-off" : "mod_headphones-off", x, textY, color);
    }
 
    private static final java.util.IdentityHashMap<String[], String> ICONS = new java.util.IdentityHashMap<>();
 
    static {
-      ICONS.put(ICON_MIC, "chat");
-      ICONS.put(ICON_HEADPHONES, "music");
-      ICONS.put(ICON_HANGUP, "power");
+      ICONS.put(ICON_MIC, "mod_mic");
+      ICONS.put(ICON_HEADPHONES, "mod_headphones");
+      ICONS.put(ICON_HANGUP, "mod_hangup");
       ICONS.put(ICON_WAVE, "hud");
       ICONS.put(ICON_SERVER, "server");
       ICONS.put(ICON_KEYBOARD, "grid");
       ICONS.put(ICON_GEAR, "gear");
       ICONS.put(ICON_PLUG, "sparkle");
       ICONS.put(ICON_CLOSE, "close");
-      ICONS.put(ICON_SPEAKER, "music");
+      ICONS.put(ICON_SPEAKER, "mod_volume");
       ICONS.put(ICON_SEARCH, "search");
       ICONS.put(ICON_CHECK, "check");
    }
@@ -249,14 +254,11 @@ public final class Glass {
    }
 
    public static void card(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, float op) {
-      roundRect(g, x, y, w, h, r, alpha(0xE60A0F0C, op));
-      roundGradient(g, x, y, w, h, r, alpha(withAlpha(ACCENT, 34), op), alpha(withAlpha(ACCENT, 0), op));
-      roundOutline(g, x, y, w, h, r, alpha(withAlpha(ACCENT, 110), op));
+      roundRect(g, x, y, w, h, r, alpha(0xE6121418, op));
    }
 
    public static void inset(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, float op) {
-      roundRect(g, x, y, w, h, r, alpha(0xB0050806, op));
-      roundOutline(g, x, y, w, h, r, alpha(0x30FFFFFF, op));
+      roundRect(g, x, y, w, h, r, alpha(0xB0262A31, op)); // flache Kachel ohne Rand
    }
 
    public static void icon(GuiGraphicsExtractor g, String[] icon, int x, int y, int color) {

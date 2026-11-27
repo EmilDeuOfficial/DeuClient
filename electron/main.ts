@@ -6,9 +6,10 @@ import { app, BrowserWindow, dialog, ipcMain, screen, shell, nativeImage } from 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { EventMap, LaunchOptions, ProgressEvent, Settings } from '../shared/types';
+import type { EventMap, LaunchOptions, ProgressEvent, Settings, WorldSettings } from '../shared/types';
 import * as accounts from './auth/accounts';
 import { deuCoreInfo, managedModsFor, removedManaged, restoreManaged } from './game/deucore';
+import { readWorldSettings, worldInUse, writeWorldSettings } from './game/worlds';
 import * as instances from './game/instances';
 import { findJavaInstalls, downloadTemurin } from './game/java';
 import { getGameState, killGame, launchGame } from './game/launch';
@@ -194,6 +195,7 @@ function registerIpc() {
   handle('settings:save', (patch: Partial<Settings>) => {
     const saved = saveSettings(patch);
     if (patch.launchOnStartup !== undefined && app.isPackaged) app.setLoginItemSettings({ openAtLogin: saved.launchOnStartup });
+    emit('settings:changed', saved); // andere Fenster (Konsole) uebernehmen Sprache und Themefarbe
     return saved;
   });
   handle('app:clearCache', () => {
@@ -241,8 +243,8 @@ function registerIpc() {
   handle('instances:create', async (input) => {
     const inst = instances.createInstance(input);
     emit('instances:changed', instances.listInstances());
-    // Fabric API im Hintergrund vorinstallieren
-    if (inst.loader === 'fabric') void modrinth.ensureFabricApi(inst.id);
+    // Fabric API und Leistungs-Mods im Hintergrund vorinstallieren
+    if (inst.loader === 'fabric') void modrinth.ensureEssentials(inst.id).catch(() => undefined);
     return inst;
   });
   handle('instances:update', (id: string, patch) => {
@@ -265,6 +267,19 @@ function registerIpc() {
     return managedModsFor(inst).map((m) => ({ ...m, removed: removed.includes(m.file) }));
   });
   handle('instances:restoreManaged', (id: string, file?: string) => restoreManaged(instances.getInstance(id), file));
+  // Welten
+  const freeWorld = (id: string, folder: string) => {
+    const dir = instances.worldDir(id, folder);
+    const game = getGameState();
+    if ((game.running && game.instanceId === id) || worldInUse(dir)) {
+      throw new Error('Die Welt ist gerade in Minecraft geöffnet. Beende zuerst das Spiel.');
+    }
+    return dir;
+  };
+  handle('instances:worldSettings', (id: string, folder: string) => readWorldSettings(instances.worldDir(id, folder)));
+  handle('instances:saveWorld', (id: string, folder: string, value: WorldSettings) => writeWorldSettings(freeWorld(id, folder), value));
+  // in den Papierkorb, damit sich eine Welt zur Not zurückholen lässt
+  handle('instances:deleteWorld', async (id: string, folder: string) => shell.trashItem(freeWorld(id, folder)));
 
   // Versionen
   handle('versions:list', (snapshots?: boolean) => listVersions(!!snapshots));
@@ -296,8 +311,10 @@ function registerIpc() {
       else if (e.stage === 'done') consoleWindow?.close();
     };
     try {
-      // Fabric API für die Standard-Instanz sicherstellen (DeuClient)
-      await modrinth.ensureFabricApi(opts.instanceId).catch(() => undefined);
+      // Fabric API und Leistungs-Mods sicherstellen (nicht, während Minecraft schon läuft)
+      if (!getGameState().running) {
+        await modrinth.ensureEssentials(opts.instanceId, (e) => progress({ ...e, percent: 0.01 })).catch(() => undefined);
+      }
       await launchGame(opts, { progress, log: pushLog, state: (s) => emit('game:state', s) });
       emit('instances:changed', instances.listInstances());
     } catch (e) {

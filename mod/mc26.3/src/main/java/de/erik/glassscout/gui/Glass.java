@@ -60,6 +60,10 @@ public final class Glass {
 
    public static int lerpColor(int a, int b, float t) {
       t = Math.max(0.0F, Math.min(1.0F, t));
+      if (eu.deusmp.deucore.Theme.mixed(a, b)) {
+         a = eu.deusmp.deucore.Theme.c(a);
+         b = eu.deusmp.deucore.Theme.c(b);
+      }
       int aa = a >>> 24 & 0xFF;
       int ar = a >> 16 & 0xFF;
       int ag = a >> 8 & 0xFF;
@@ -198,14 +202,11 @@ public final class Glass {
    }
 
    public static void card(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, float op) {
-      roundRect(g, x, y, w, h, r, alpha(0xE60A0F0C, op));
-      roundGradient(g, x, y, w, h, r, alpha(withAlpha(accent(), 34), op), alpha(withAlpha(accent(), 0), op));
-      roundOutline(g, x, y, w, h, r, alpha(withAlpha(accent(), 110), op));
+      roundRect(g, x, y, w, h, r, alpha(0xE6121418, op));
    }
 
    public static void inset(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, float op) {
-      roundRect(g, x, y, w, h, r, alpha(0xB0050806, op));
-      roundOutline(g, x, y, w, h, r, alpha(0x30FFFFFF, op));
+      roundRect(g, x, y, w, h, r, alpha(0xB0262A31, op)); // flache Kachel ohne Rand
    }
 
    public static void icon(GuiGraphicsExtractor g, String[] icon, int x, int y, int color) {

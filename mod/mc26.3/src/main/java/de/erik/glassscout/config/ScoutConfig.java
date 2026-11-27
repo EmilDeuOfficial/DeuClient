@@ -21,10 +21,15 @@ public class ScoutConfig {
    public boolean showExtras = true;
    public int accent = 3;
    public int opacity = 92;
+   /** Darstellung wie bei den HUD-Elementen */
+   public float scale = 1.0F;
+   public int bgStyle = 1;
+   public int bgTransparency = 10;
+   public int styleVersion = 0;
    public List<String> commands = new ArrayList<>(List.of("invsee", "openinv", "oi", "inv", "invs", "inventorysee", "einsehen"));
 
    public int accentColor() {
-      return ACCENT_COLORS[Math.floorMod(this.accent, ACCENT_COLORS.length)];
+      return 0xFF2EFF7A; // Themefarbe des Clients (wird beim Zeichnen umgefaerbt)
    }
 
    public static ScoutConfig get() {
@@ -52,6 +57,14 @@ public class ScoutConfig {
 
       if (instance.commands == null) {
          instance.commands = new ArrayList<>(List.of("invsee"));
+      }
+
+      if (instance.styleVersion < 1) {
+         if (instance.bgTransparency == 0) {
+            instance.bgTransparency = 10;
+         }
+
+         instance.styleVersion = 1;
       }
 
       save();

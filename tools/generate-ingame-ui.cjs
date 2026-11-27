@@ -27,11 +27,14 @@ write('font/inter_license.txt', fs.readFileSync(path.join(interDir, 'LICENSE_FON
 const ttf = (file, size, oversample) => ({ providers: [{ type: 'ttf', file: `deucore:${file}`, shift: [0, 0.5], size, oversample, skip: '' }, { type: 'reference', id: 'minecraft:default' }] });
 write('font/ui.json', Buffer.from(JSON.stringify(ttf('inter_medium.ttf', 8.5, 2.0), null, 2)));
 write('font/ui_bold.json', Buffer.from(JSON.stringify(ttf('inter_bold.ttf', 8.5, 2.0), null, 2)));
-for (let s = 1; s <= 6; s++) {
-  write(`font/ui_${s}.json`, Buffer.from(JSON.stringify(ttf('inter_medium.ttf', 8.5, s), null, 2)));
-  write(`font/ui_bold_${s}.json`, Buffer.from(JSON.stringify(ttf('inter_bold.ttf', 8.5, s), null, 2)));
+// eine Schrift je Viertelschritt (ui_x4 = 1.0 bis ui_x48 = 12.0): HUD-Elemente bleiben in jeder Groesse scharf
+for (let q = 4; q <= 48; q++) {
+  write(`font/ui_x${q}.json`, Buffer.from(JSON.stringify(ttf('inter_medium.ttf', 8.5, q / 4), null, 2)));
+  write(`font/ui_bold_x${q}.json`, Buffer.from(JSON.stringify(ttf('inter_bold.ttf', 8.5, q / 4), null, 2)));
+  // Kartentitel im Mod-Menue: groesser, normale Staerke
+  write(`font/ui_title_x${q}.json`, Buffer.from(JSON.stringify(ttf('inter_medium.ttf', 10, q / 4), null, 2)));
 }
-console.log('  ✓ Schrift Inter (ui, ui_bold, je GUI-Skalierung 1-6)');
+console.log('  ✓ Schrift Inter (ui, ui_bold, je Viertelschritt 1-12)');
 
 /* ---------------- Linien-Icons ---------------- */
 // 24×24, weiße Linien - im Spiel per Farbe eingefärbt

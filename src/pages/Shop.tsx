@@ -1,6 +1,6 @@
 /**
  * Shop: Die DeuClient-Capes und -Flügel lassen sich hier nur am eigenen Skin ausprobieren (Vorschau) -
- * gekauft werden können sie erst, wenn sie live gehen. Eigene Capes (Editor / Upload) können angelegt
+ * sie sind kostenlos und werden im Spiel angelegt. Eigene Capes (Editor / Upload) können angelegt
  * werden: "Anlegen" überträgt die Auswahl in alle Modpacks mit DeuCore.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -13,19 +13,44 @@ import { Icon } from '../components/Icons';
 import { Player3D } from '../components/Player3D';
 import { useApp } from '../store';
 
-const CAPES = [
-  ['gold', 'Gold'], ['nacht', 'Sternennacht'], ['flamme', 'Flamme'],
-  ['eis', 'Eiskristall'], ['smaragd', 'Smaragd'],
-] as const;
-const WINGS = [
-  ['engel', 'Engel'], ['daemon', 'Dämon'], ['eis', 'Eis'],
-  ['phoenix', 'Phönix'], ['schatten', 'Schatten'], ['smaragd', 'Smaragd'],
-] as const;
+interface Collection {
+  id: string;
+  name: string;
+  capes: readonly (readonly [string, string])[];
+  wings: readonly (readonly [string, string])[];
+}
+
+/** Neue Kollektionen hier anhaengen (und in der Mod: Cosmetics.COLLECTIONS) */
+const COLLECTIONS: Collection[] = [
+  {
+    id: 'mythos',
+    name: 'Mythos-Kollektion',
+    capes: [
+      ['gold', 'Gold'], ['nacht', 'Sternennacht'], ['flamme', 'Flamme'],
+      ['eis', 'Eiskristall'], ['smaragd', 'Smaragd'], ['daemon', 'Dämon'],
+    ],
+    wings: [
+      ['engel', 'Engel'], ['daemon', 'Dämon'], ['eis', 'Eis'],
+      ['phoenix', 'Phönix'], ['schatten', 'Schatten'], ['smaragd', 'Smaragd'],
+    ],
+  },
+];
+
+/** Eingeklappte Kollektionen (nur eine Anzeige-Vorliebe) */
+const COLLAPSED_KEY = 'deu.shop.collapsed';
+function loadCollapsed(): string[] {
+  try {
+    const list: unknown = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]');
+    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 type Tab = 'catalog' | 'editor' | 'mine';
 
 /** Startwerte fuer den Cape-Editor (neues Bild oder ein gespeichertes Cape zum Bearbeiten) */
-interface EditorSeed { grid: string[]; res: number; name: string; edge?: string; id?: string }
+interface EditorSeed { grid: string[]; elytra?: string[]; res: number; name: string; edge?: string; id?: string }
 
 export function Shop() {
   const { toast } = useApp();
@@ -78,7 +103,16 @@ export function Shop() {
     const [er, eg, eb] = pctx.getImageData(0, 0, 1, 1).data;
     const edge = `#${[er, eg, eb].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
     if (k > 2) toast('HD-Cape: für die Bearbeitung wird es auf 128×64 verkleinert', 'info');
-    setEditorSeed({ grid, res, name: c.name, edge, id: c.id });
+    // Elytra-Aussenseite (x 36, y 2, 10×20) ebenfalls ins Raster laden
+    cv.height = EH * res;
+    ctx.imageSmoothingEnabled = k > res;
+    ctx.drawImage(img, 36 * k, 2 * k, 10 * k, EH * k, 0, 0, cols, EH * res);
+    const wing = ctx.getImageData(0, 0, cols, EH * res).data;
+    const elytra = Array.from({ length: cols * EH * res }, (_, i) => {
+      const [r, g, b, a] = [wing[i * 4], wing[i * 4 + 1], wing[i * 4 + 2], wing[i * 4 + 3]];
+      return a < 40 ? '#0a110c' : `#${[r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    });
+    setEditorSeed({ grid, elytra, res, name: c.name, edge, id: c.id });
     setTab('editor');
   };
 
@@ -98,7 +132,7 @@ export function Shop() {
         <div>
           <h2 className="font-display text-3xl font-black text-accent-gradient">Shop</h2>
           <p className="mt-1 max-w-2xl text-sm text-ink-200/60">
-            Probiere die DeuClient-Capes und -Flügel an deinem eigenen Skin aus. Kaufen kannst du sie, sobald sie live gehen. Gestalte außerdem dein eigenes Cape oder lade ein Bild hoch.
+            Probiere die DeuClient-Capes und -Flügel an deinem eigenen Skin aus. Die Mythos-Kollektion ist kostenlos, anlegen kannst du sie im Spiel unter Kosmetik. Gestalte außerdem dein eigenes Cape oder lade ein Bild hoch.
           </p>
         </div>
       </div>
@@ -214,6 +248,16 @@ function Catalog() {
   const { accounts } = useApp();
   const skinUrl = accounts.accounts.find((a) => a.uuid === accounts.activeUuid)?.skinUrl;
   const [trying, setTrying] = useState<EquippedCosmetics>({ cape: '', wings: '' });
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const toggle = (id: string) => {
+    const next = collapsed.includes(id) ? collapsed.filter((x) => x !== id) : [...collapsed, id];
+    setCollapsed(next);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(next));
+    } catch {
+      /* ohne Speicher gilt die Auswahl nur bis zum Neuladen */
+    }
+  };
   return (
     <div className="grid grid-cols-[300px_1fr] items-start gap-6">
       <aside className="card sticky top-2 space-y-3 p-4">
@@ -225,27 +269,47 @@ function Catalog() {
         </div>
         <Player3D skinUrl={skinUrl} cape={trying.cape} wings={trying.wings} />
       </aside>
-      <div className="space-y-6">
-        <section>
-          <h3 className="mb-3 font-display text-lg font-bold">Capes</h3>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
-            {CAPES.map(([id, name]) => (
-              <Tile key={id} active={trying.cape === id} title={name} action="Testen" activeLabel="Aktiv" note="Bald kaufbar" onAction={() => setTrying({ ...trying, cape: id })}>
-                <CapeFront src={`./cosmetics/cape/${id}.png`} size={96} />
-              </Tile>
-            ))}
-          </div>
-        </section>
-        <section>
-          <h3 className="mb-3 font-display text-lg font-bold">Galaxie-Flügel</h3>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
-            {WINGS.map(([id, name]) => (
-              <Tile key={id} active={trying.wings === id} title={name} action="Testen" activeLabel="Aktiv" note="Bald kaufbar" onAction={() => setTrying({ ...trying, wings: id })}>
-                <WingPair id={id} size={64} />
-              </Tile>
-            ))}
-          </div>
-        </section>
+      <div className="space-y-4">
+        {COLLECTIONS.map((c) => {
+          const open = !collapsed.includes(c.id);
+          return (
+            <section key={c.id} className="space-y-4">
+              <button
+                className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-ink-950/60 px-4 py-3 text-left transition-colors hover:border-accent-400/30"
+                aria-expanded={open}
+                onClick={() => toggle(c.id)}
+              >
+                <Icon name="chevronDown" size={18} className={`shrink-0 text-ink-200/60 transition-transform ${open ? '' : '-rotate-90'}`} />
+                <h3 className="font-display text-xl font-black text-accent-gradient">{c.name}</h3>
+                <span className="ml-auto text-xs font-semibold text-ink-200/50">{c.capes.length + c.wings.length}</span>
+              </button>
+              {open && (
+                <>
+                  <div>
+                    <h4 className="mb-3 font-display text-lg font-bold">Capes</h4>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
+                      {c.capes.map(([id, name]) => (
+                        <Tile key={id} active={trying.cape === id} title={name} action="Testen" activeLabel="Aktiv" onAction={() => setTrying({ ...trying, cape: id })}>
+                          <CapeFront src={`./cosmetics/cape/${id}.png`} size={96} />
+                        </Tile>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="mb-3 font-display text-lg font-bold">Flügel</h4>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4">
+                      {c.wings.map(([id, name]) => (
+                        <Tile key={id} active={trying.wings === id} title={name} action="Testen" activeLabel="Aktiv" onAction={() => setTrying({ ...trying, wings: id })}>
+                          <WingPair id={id} size={64} />
+                        </Tile>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </section>
+          );
+        })}
       </div>
     </div>
   );
@@ -254,6 +318,9 @@ function Catalog() {
 /* ====================== Pixel-Editor ====================== */
 
 const W = 10, H = 16;
+/** Hoehe eines Elytra-Fluegels (10×20 Pixel bei 64×32) */
+const EH = 20;
+type Part = 'cape' | 'elytra';
 const PALETTE = [
   '#2eff7a', '#9fffc0', '#17a84a', '#1fd35f', '#6bff9e', '#0f7a35', '#0a110c', '#000000',
   '#ffffff', '#cfd6ea', '#ff5c72', '#c81e3a', '#ff9a1f', '#3dff8a', '#0b7a37', '#4fd1ff', '#1d4ed8', '#5c4033',
@@ -272,13 +339,19 @@ const TEMPLATES: Record<string, (x: number, y: number) => string> = {
   Verlauf: (_x, y) => ['#9fffc0', '#2eff7a', '#1fd35f', '#17a84a', '#1fd35f', '#17a84a', '#0f7a35', '#0f4025'][Math.floor(y / 2)],
   Schach: (x, y) => ((x + y) % 2 === 0 ? '#ffffff' : '#000000'),
 };
-/** Vorlage in der gewuenschten Aufloesung (k = 1: 10x16, k = 2: 20x32) */
-const fromTemplate = (name: string, k = 1) =>
-  Array.from({ length: W * H * k * k }, (_, i) => TEMPLATES[name](Math.floor((i % (W * k)) / k), Math.floor(Math.floor(i / (W * k)) / k)));
+/** Vorlage in der gewuenschten Aufloesung (k = 1: 10x16, k = 2: 20x32); h = Hoehe des Teils bei k = 1 */
+const fromTemplate = (name: string, k = 1, h = H) =>
+  Array.from({ length: W * h * k * k }, (_, i) => TEMPLATES[name](Math.floor((i % (W * k)) / k), Math.floor((Math.floor(Math.floor(i / (W * k)) / k) * H) / h)));
+
+/** Startmotiv der Elytra: das Cape-Motiv auf die Fluegelhoehe gestreckt */
+function elytraFromCape(grid: string[], k: number): string[] {
+  const cols = W * k;
+  return Array.from({ length: cols * EH * k }, (_, i) => grid[Math.floor((Math.floor(i / cols) * H) / EH) * cols + (i % cols)]);
+}
 
 /** Raster auf eine andere Aufloesung bringen (hoch: Pixel verdoppeln, runter: jeden zweiten Pixel uebernehmen) */
-function resample(grid: string[], from: number, to: number): string[] {
-  const fw = W * from, tw = W * to, th = H * to;
+function resample(grid: string[], from: number, to: number, h = H): string[] {
+  const fw = W * from, tw = W * to, th = h * to;
   return Array.from({ length: tw * th }, (_, i) => {
     const x = i % tw, y = Math.floor(i / tw);
     return grid[Math.floor((y * from) / to) * fw + Math.floor((x * from) / to)];
@@ -288,7 +361,7 @@ function resample(grid: string[], from: number, to: number): string[] {
 type Tool = 'pen' | 'fill' | 'eraser' | 'picker';
 
 /** Baut aus der Vorderseite (10k×16k) ein vollstaendiges Cape (64k×32k): Rueckseite, Raender, Elytra */
-function buildCapePng(grid: string[], edge: string, k: number): string {
+function buildCapePng(grid: string[], elytra: string[], edge: string, k: number): string {
   const cols = W * k, rows = H * k;
   const c = document.createElement('canvas');
   c.width = 64 * k;
@@ -303,13 +376,14 @@ function buildCapePng(grid: string[], edge: string, k: number): string {
       ctx.fillRect(12 * k + (cols - 1 - x), k + y, 1, 1); // Innenseite (gespiegelt)
     }
   }
-  // Elytra: Rand-Farbe als Grund, Motiv vergroessert hineinzeichnen
+  // Elytra: Rand-Farbe als Grund, eigenes Motiv auf Aussen- (x 36) und Innenseite (x 24, gespiegelt)
   ctx.fillStyle = edge;
   ctx.fillRect(22 * k, 0, 24 * k, 22 * k);
-  for (let y = 0; y < rows; y++) {
+  for (let y = 0; y < EH * k; y++) {
     for (let x = 0; x < cols; x++) {
-      ctx.fillStyle = grid[y * cols + x];
-      ctx.fillRect(24 * k + x * 2, 2 * k + y, 2, 1);
+      ctx.fillStyle = elytra[y * cols + x];
+      ctx.fillRect(36 * k + x, 2 * k + y, 1, 1);
+      ctx.fillRect(24 * k + (cols - 1 - x), 2 * k + y, 1, 1);
     }
   }
   return c.toDataURL('image/png');
@@ -318,13 +392,25 @@ function buildCapePng(grid: string[], edge: string, k: number): string {
 function CapeEditor({ seed, onSaved }: { seed: EditorSeed | null; onSaved: (c: CustomCape) => void }) {
   const { toast } = useApp();
   const [res, setRes] = useState(seed?.res ?? 1); // 1 = 64×32, 2 = 128×64
-  const [grid, setGrid] = useState<string[]>(() => seed?.grid ?? fromTemplate('DeuClient', 1));
-  const cols = W * res, rows = H * res;
+  const [part, setPart] = useState<Part>('cape');
+  const [capeGrid, setCapeGrid] = useState<string[]>(() => seed?.grid ?? fromTemplate('DeuClient', 1));
+  // null = noch nicht selbst bearbeitet: die Elytra folgt dem Cape-Motiv
+  const [elytraGrid, setElytraGrid] = useState<string[] | null>(() => seed?.elytra ?? null);
+  const elytra = elytraGrid ?? elytraFromCape(capeGrid, res);
+  const grid = part === 'cape' ? capeGrid : elytra;
+  const setGrid = (g: string[]) => (part === 'cape' ? setCapeGrid(g) : setElytraGrid(g));
+  const partH = part === 'cape' ? H : EH;
+  const cols = W * res, rows = partH * res;
   const changeRes = (next: number) => {
     if (next === res) return;
-    setGrid(resample(grid, res, next));
+    setCapeGrid(resample(capeGrid, res, next));
+    if (elytraGrid) setElytraGrid(resample(elytraGrid, res, next, EH));
     setHistory([]);
     setRes(next);
+  };
+  const changePart = (next: Part) => {
+    setPart(next);
+    setHistory([]);
   };
   const [color, setColor] = useState('#2eff7a');
   const [edge, setEdge] = useState(seed?.edge ?? '#2a0f52');
@@ -373,7 +459,7 @@ function CapeEditor({ seed, onSaved }: { seed: EditorSeed | null; onSaved: (c: C
     else setGrid(next);
   };
 
-  const preview = buildCapePng(grid, edge, res);
+  const preview = buildCapePng(capeGrid, elytra, edge, res);
 
   const save = async () => {
     try {
@@ -425,7 +511,7 @@ function CapeEditor({ seed, onSaved }: { seed: EditorSeed | null; onSaved: (c: C
           <div className="label">Vorlagen</div>
           <div className="flex flex-wrap gap-1.5">
             {Object.keys(TEMPLATES).map((t) => (
-              <button key={t} className="chip" onClick={() => commit(fromTemplate(t, res))}>{t}</button>
+              <button key={t} className="chip" onClick={() => commit(fromTemplate(t, res, partH))}>{t}</button>
             ))}
           </div>
         </div>
@@ -436,6 +522,11 @@ function CapeEditor({ seed, onSaved }: { seed: EditorSeed | null; onSaved: (c: C
 
       {/* Leinwand */}
       <section className="card flex flex-col items-center justify-center p-6" onMouseUp={() => (painting.current = false)} onMouseLeave={() => (painting.current = false)}>
+        <div className="mb-4 flex gap-1.5">
+          {([['cape', 'Cape'], ['elytra', 'Elytra']] as const).map(([id, label]) => (
+            <button key={id} className={`chip ${part === id ? 'chip-active' : ''}`} onClick={() => changePart(id)}>{label}</button>
+          ))}
+        </div>
         <div
           className="grid select-none overflow-hidden rounded-lg border-2 border-accent-400/40 shadow-card"
           style={{ gridTemplateColumns: `repeat(${cols}, ${26 / res}px)`, background: edge }}
@@ -451,7 +542,14 @@ function CapeEditor({ seed, onSaved }: { seed: EditorSeed | null; onSaved: (c: C
             />
           ))}
         </div>
-        <div className="mt-3 text-xs text-ink-200/55">{`Vorderseite des Capes (${cols} × ${rows} Pixel) - Klicken und ziehen zum Malen`}</div>
+        <div className="mt-3 text-xs text-ink-200/55">
+          {part === 'cape' ? `Vorderseite des Capes (${cols} × ${rows} Pixel) - Klicken und ziehen zum Malen` : `Elytra-Flügel (${cols} × ${rows} Pixel) - Klicken und ziehen zum Malen`}
+        </div>
+        {part === 'elytra' && elytraGrid && (
+          <button className="btn-ghost mt-3 !py-1.5 text-xs" onClick={() => { setElytraGrid(null); setHistory([]); }}>
+            <Icon name="refresh" size={12} /> Vom Cape übernehmen
+          </button>
+        )}
       </section>
 
       {/* Vorschau + Speichern */}

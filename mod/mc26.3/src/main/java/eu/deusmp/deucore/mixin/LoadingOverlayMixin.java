@@ -65,8 +65,8 @@ public abstract class LoadingOverlayMixin {
         int a = (int) (opacity * 255);
         if (a <= 2) return;
 
-        g.fillGradient(0, 0, w, h / 2, DeuRender.argb(0x0B2014, a), DeuRender.argb(0x0F2B1A, a));
-        g.fillGradient(0, h / 2, w, h, DeuRender.argb(0x0F2B1A, a), DeuRender.argb(DeuRender.NIGHT, a));
+        g.fillGradient(0, 0, w, h / 2, DeuRender.argb(0x12151A, a), DeuRender.argb(0x1B1E24, a));
+        g.fillGradient(0, h / 2, w, h, DeuRender.argb(0x1B1E24, a), DeuRender.argb(DeuRender.NIGHT, a));
 
         float pulse = DeuRender.pulse(2600);
         int lw = Math.min(520, (int) (w * 0.7f));

@@ -238,12 +238,21 @@ public final class HudData {
          d.cpsL = 7;
          d.cpsR = 2;
          d.clockTicks = 4200L;
-         sample = d;
+         // ausserhalb einer Welt gibt es noch keine Item-Daten: Beispiel dann nicht merken
+         if (net.minecraft.client.Minecraft.getInstance().level != null) {
+            sample = d;
+         }
+
          return d;
       }
    }
 
    private static ItemStack damaged(Item item, float used) {
+      // vor dem Laden einer Welt sind Item-Komponenten nicht gebunden: new ItemStack wuerde das Spiel abstuerzen
+      if (net.minecraft.client.Minecraft.getInstance().level == null) {
+         return ItemStack.EMPTY;
+      }
+
       ItemStack s = new ItemStack(item);
       if (s.isDamageableItem()) {
          s.setDamageValue(Math.round(s.getMaxDamage() * used));

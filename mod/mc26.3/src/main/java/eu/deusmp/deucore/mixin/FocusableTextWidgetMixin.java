@@ -18,7 +18,7 @@ public abstract class FocusableTextWidgetMixin {
             g.fill(x1, y1, x2, y2, color);
             return;
         }
-        DeuRender.roundRect(g, x1, y1, x2 - x1, y2 - y1, 4, 0xE60A0F0C);
+        DeuRender.roundRect(g, x1, y1, x2 - x1, y2 - y1, 4, 0xE6121418);
     }
 
     @Redirect(method = "extractWidgetRenderState", at = @At(value = "INVOKE",

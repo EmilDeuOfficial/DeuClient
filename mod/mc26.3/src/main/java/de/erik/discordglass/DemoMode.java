@@ -22,6 +22,7 @@ final class DemoMode {
          switch (ticks) {
             case 1:
                fill(s);
+               mc.player.addEffect(new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.SPEED, 6000));
                mc.player.setXRot(-12.0F);
                mc.player.setYRot(mc.player.getYRot() + 140.0F);
                break;
@@ -39,22 +40,30 @@ final class DemoMode {
                shot(mc, "02_overview");
                break;
             case 220:
-               mc.gui.setScreen(GlassScreen.demo(null, 1, "g2", false));
+               mc.gui.setScreen(GlassScreen.demo(null, 0, "g2", false));
                break;
             case 265:
-               shot(mc, "03_servers");
+               shot(mc, "03_channels");
                break;
             case 270:
                mc.gui.setScreen(GlassScreen.demo(null, 2, null, true));
                break;
             case 315:
-               shot(mc, "04_hotkeys");
+               shot(mc, "04_capture");
                break;
             case 320:
-               mc.gui.setScreen(GlassScreen.demo(null, 3, null, false));
+               mc.gui.setScreen(GlassScreen.demo(null, 2, null, false));
                break;
             case 365:
                shot(mc, "05_settings");
+               break;
+            case 366:
+               s.status = DiscordState.Status.DISCONNECTED;
+               mc.gui.setScreen(GlassScreen.demo(null, 0, null, false));
+               break;
+            case 369:
+               shot(mc, "05b_offline");
+               s.status = DiscordState.Status.CONNECTED;
                break;
             case 370:
                mc.gui.setScreen(null);
@@ -71,6 +80,44 @@ final class DemoMode {
                shot(mc, "06_hud_right");
                break;
             case 440:
+               mc.gui.setScreen(GlassScreen.demo(null, 1, null, false));
+               break;
+            case 560:
+               shot(mc, "07_text");
+               break;
+            case 565:
+               mc.gui.setScreen(GlassScreen.demo(null, 0, null, false));
+               break;
+            case 600:
+               shot(mc, "08_call_icons");
+               break;
+            case 605: // Maus auf dem ersten Freund
+               mc.gui.setScreen(GlassScreen.demo(null, 0, null, false).demoHover(70, 92));
+               break;
+            case 640:
+               shot(mc, "09_friends_call");
+               break;
+            case 645: // Maus auf einem Mitglied im Call: Stern
+               mc.gui.setScreen(GlassScreen.demo(null, 0, null, false).demoHover(300, 100));
+               break;
+            case 680:
+               shot(mc, "10_member_star");
+               break;
+            case 685:
+               s.textChannelId = null;
+               mc.gui.setScreen(GlassScreen.demo(null, 1, null, false).demoFriend("u5").demoHover(70, 132));
+               break;
+            case 720:
+               shot(mc, "11_friend_without_chat");
+               break;
+            case 725: // Maus auf einer Nachricht: Stern neben dem Namen
+               s.textChannelId = "d1";
+               mc.gui.setScreen(GlassScreen.demo(null, 1, null, false).demoHover(300, 74));
+               break;
+            case 760:
+               shot(mc, "12_message_star");
+               break;
+            case 770:
                mc.stop();
          }
 
@@ -91,9 +138,8 @@ final class DemoMode {
       GlassConfig cfg = GlassConfig.get();
       cfg.clientId = "1301234567890123456";
       cfg.clientSecret = "demo-secret-value-xyz";
-      cfg.hudCorner = 0;
       cfg.hudEnabled = true;
-      cfg.hudOpacity = 80;
+      cfg.bgTransparency = 20;
       s.status = DiscordState.Status.CONNECTED;
       s.userId = "u1";
       s.userName = "Erik";
@@ -118,6 +164,23 @@ final class DemoMode {
          m.selfMute = (Boolean)p[3];
          m.selfDeaf = (Boolean)p[4];
       }
+
+      String pic = "https://cdn.discordapp.com/embed/avatars/";
+      for (int i = 1; i <= 4; i++) s.guildIcons.put("g" + i, pic + i + ".png");
+      DiscordState.Member luna = s.findMember("u2");
+      if (luna != null) luna.avatar = pic + "0.png";
+      cfg.friends = new java.util.concurrent.CopyOnWriteArrayList<>();
+      cfg.friends.add(new GlassConfig.Friend("d1", "u2", "Luna", pic + "0.png"));
+      cfg.friends.add(new GlassConfig.Friend("d2", "u3", "Finn", ""));
+      cfg.friends.add(new GlassConfig.Friend("", "u5", "Mia", ""));
+      s.textChannelId = "d1";
+      s.textChannelName = "Luna";
+      long t = System.currentTimeMillis() - 600_000L;
+      s.messages.clear();
+      s.messages.add(new DiscordState.Message("m1", "u2", "Luna", pic + "0.png", "Hey, bist du schon auf dem Server?", t));
+      s.messages.add(new DiscordState.Message("m2", "u2", "Luna", pic + "0.png", "Wir bauen gerade die neue Basis am Fluss und brauchen noch Holz. Bring bitte welches mit, wenn du kommst.", t + 20_000L));
+      s.messages.add(new DiscordState.Message("m3", "u1", "Erik", "", "Bin in fünf Minuten da!", t + 90_000L));
+      s.messages.add(new DiscordState.Message("m4", "u2", "Luna", pic + "0.png", "Super @" + DiscordState.placeholder("jemand") + " [" + DiscordState.placeholder("Anhang") + "]", t + 150_000L));
 
       s.guilds.clear();
       s.guilds

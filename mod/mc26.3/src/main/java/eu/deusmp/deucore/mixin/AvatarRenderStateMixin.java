@@ -11,6 +11,19 @@ public abstract class AvatarRenderStateMixin implements DeuAvatarState {
     @Unique
     private String deucore$wings = "";
 
+    @Unique
+    private int deucore$elytraPose = -1;
+
+    @Override
+    public int deucore$getElytraPose() {
+        return deucore$elytraPose;
+    }
+
+    @Override
+    public void deucore$setElytraPose(int pose) {
+        this.deucore$elytraPose = pose;
+    }
+
     @Override
     public String deucore$getWings() {
         return deucore$wings;

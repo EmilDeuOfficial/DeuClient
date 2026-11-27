@@ -9,7 +9,7 @@
   "autoConnect": true,
   "richPresence": true,
   "hudEnabled": true,
-  "hudCorner": 0,
+  "hudCorner": 1,
   "hudOnlySpeaking": false,
   "notifications": true,
   "hudOpacity": 70,

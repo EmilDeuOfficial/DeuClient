@@ -87,7 +87,7 @@ export function InstanceEditor({ open, instance, onClose }: { open: boolean; ins
                 className={`rounded-xl border px-4 py-3 text-left transition disabled:opacity-50 ${loader === l ? 'border-accent-400/70 bg-accent-400/10' : 'border-white/10 hover:border-white/25'}`}
               >
                 <div className="font-bold capitalize">{l}</div>
-                <div className="text-xs text-ink-200/60">{l === 'fabric' ? 'Mods + DeuCore' : 'Reines Minecraft'}</div>
+                <div className="text-xs text-ink-200/60">{l === 'fabric' ? t('inst.loaderFabricHint') : t('inst.loaderVanillaHint')}</div>
               </button>
             ))}
           </div>
@@ -96,7 +96,7 @@ export function InstanceEditor({ open, instance, onClose }: { open: boolean; ins
           <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-white/10 px-4 py-3">
             <div>
               <div className="font-bold">DeuClient-Mods einbauen</div>
-              <div className="text-xs text-ink-200/60">DeuCore, HUD, Discord und Scout. Ausschalten für ein reines Mod-Modpack mit eigenen Mods.</div>
+              <div className="text-xs text-ink-200/60">DeuCore, HUD, Discord, Scout und Leistungs-Mods (Sodium, Lithium, FerriteCore, ImmediatelyFast, EntityCulling). Ausschalten für ein reines Mod-Modpack mit eigenen Mods.</div>
             </div>
             <Toggle checked={!noDeu} onChange={(v) => setNoDeu(!v)} />
           </label>

@@ -11,15 +11,15 @@ const GLYPHS: Record<string, Glyph> = {
   grass: ({ id }) => (
     <>
       <defs>
-        <linearGradient id={id('top')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#9fffc0" /><stop offset="1" stopColor="#2eff7a" /></linearGradient>
+        <linearGradient id={id('top')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: 'rgb(var(--c-accent-200))' }} /><stop offset="1" style={{ stopColor: 'rgb(var(--c-accent-400))' }} /></linearGradient>
         <linearGradient id={id('l')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#9a6a3a" /><stop offset="1" stopColor="#6b4423" /></linearGradient>
         <linearGradient id={id('r')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7a4f29" /><stop offset="1" stopColor="#4d3019" /></linearGradient>
       </defs>
       <g transform="translate(0 -2.5)">
       <polygon points="9,17.5 24,26 24,40 9,31.5" fill={`url(#${id('l')})`} />
       <polygon points="39,17.5 24,26 24,40 39,31.5" fill={`url(#${id('r')})`} />
-      <path d="M9 17.5 24 26v4.2c-2-.2-2.6-2-4.4-1.6-1.8.4-1.6 2.2-3.6 2.2s-2.2-2.2-4.2-2c-1.6.2-1.8 1.8-2.8 1.4V17.5z" fill="#2fa84f" />
-      <path d="M39 17.5 24 26v4.2c2-.2 2.8-1.8 4.6-1.4 1.6.4 1.8 2 3.6 2 2 0 2.2-2.6 4.2-2.4.8.1 1.6.7 2.6.4V17.5z" fill="#238a40" />
+      <path d="M9 17.5 24 26v4.2c-2-.2-2.6-2-4.4-1.6-1.8.4-1.6 2.2-3.6 2.2s-2.2-2.2-4.2-2c-1.6.2-1.8 1.8-2.8 1.4V17.5z" style={{ fill: 'rgb(var(--c-accent-600))' }} />
+      <path d="M39 17.5 24 26v4.2c2-.2 2.8-1.8 4.6-1.4 1.6.4 1.8 2 3.6 2 2 0 2.2-2.6 4.2-2.4.8.1 1.6.7 2.6.4V17.5z" style={{ fill: 'rgb(var(--c-accent-700))' }} />
       <polygon points="24,9 39,17.5 24,26 9,17.5" fill={`url(#${id('top')})`} />
       </g>
     </>
@@ -42,9 +42,9 @@ const GLYPHS: Record<string, Glyph> = {
       <g transform="rotate(45 24 24)">
         <polygon points="21,5 24,1.5 27,5 27,29 21,29" fill={`url(#${id('blade')})`} />
         <line x1="24" y1="5" x2="24" y2="29" stroke="#64748b" strokeWidth="0.8" strokeOpacity=".6" />
-        <rect x="14.5" y="29" width="19" height="4.2" rx="2.1" fill="#2eff7a" />
+        <rect x="14.5" y="29" width="19" height="4.2" rx="2.1" style={{ fill: 'rgb(var(--c-accent-400))' }} />
         <rect x="21.8" y="33" width="4.4" height="9" rx="2" fill="#8a5a2b" />
-        <circle cx="24" cy="44.5" r="2.7" fill="#6bff9e" />
+        <circle cx="24" cy="44.5" r="2.7" style={{ fill: 'rgb(var(--c-accent-300))' }} />
       </g>
     </>
   ),
@@ -71,37 +71,37 @@ const GLYPHS: Record<string, Glyph> = {
   creeper: ({ id }) => (
     <>
       <defs>
-        <linearGradient id={id('face')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7be25a" /><stop offset="1" stopColor="#3aa12a" /></linearGradient>
+        <linearGradient id={id('face')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: 'rgb(var(--c-accent-300))' }} /><stop offset="1" style={{ stopColor: 'rgb(var(--c-accent-600))' }} /></linearGradient>
       </defs>
       <rect x="9" y="9" width="30" height="30" rx="7" fill={`url(#${id('face')})`} />
-      <rect x="14.500" y="16" width="7" height="7" rx="1.500" fill="#0b120d" />
-      <rect x="26.500" y="16" width="7" height="7" rx="1.500" fill="#0b120d" />
-      <path d="M20.500 25.500h7v4h2.500v7h-4.500v-3.500h-3v3.500H18v-7h2.500z" fill="#0b120d" />
+      <rect x="14.500" y="16" width="7" height="7" rx="1.500" style={{ fill: 'rgb(var(--c-ink-900))' }} />
+      <rect x="26.500" y="16" width="7" height="7" rx="1.500" style={{ fill: 'rgb(var(--c-ink-900))' }} />
+      <path d="M20.500 25.500h7v4h2.500v7h-4.500v-3.500h-3v3.500H18v-7h2.500z" style={{ fill: 'rgb(var(--c-ink-900))' }} />
     </>
   ),
   ender: ({ id }) => (
     <>
       <defs>
-        <radialGradient id={id('ring')} cx=".35" cy=".3" r=".9"><stop offset="0" stopColor="#5eead4" /><stop offset="1" stopColor="#0f766e" /></radialGradient>
+        <radialGradient id={id('ring')} cx=".35" cy=".3" r=".9"><stop offset="0" style={{ stopColor: 'rgb(var(--c-accent-300))' }} /><stop offset="1" style={{ stopColor: 'rgb(var(--c-accent-700))' }} /></radialGradient>
       </defs>
       <circle cx="24" cy="24" r="16" fill={`url(#${id('ring')})`} />
-      <circle cx="24" cy="24" r="9.500" fill="#06201d" />
-      <circle cx="24" cy="24" r="5" fill="#5eead4" />
+      <circle cx="24" cy="24" r="9.500" style={{ fill: 'rgb(var(--c-ink-950))' }} />
+      <circle cx="24" cy="24" r="5" style={{ fill: 'rgb(var(--c-accent-300))' }} />
       <circle cx="22.200" cy="22.200" r="1.600" fill="#ffffff" fillOpacity=".85" />
     </>
   ),
   package: ({ id }) => (
     <>
       <defs>
-        <linearGradient id={id('t')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#d4ffe4" /><stop offset="1" stopColor="#6bff9e" /></linearGradient>
-        <linearGradient id={id('l')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#2eff7a" /><stop offset="1" stopColor="#17a84a" /></linearGradient>
-        <linearGradient id={id('r')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#1fd35f" /><stop offset="1" stopColor="#0f7a35" /></linearGradient>
+        <linearGradient id={id('t')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: 'rgb(var(--c-accent-100))' }} /><stop offset="1" style={{ stopColor: 'rgb(var(--c-accent-300))' }} /></linearGradient>
+        <linearGradient id={id('l')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: 'rgb(var(--c-accent-400))' }} /><stop offset="1" style={{ stopColor: 'rgb(var(--c-accent-600))' }} /></linearGradient>
+        <linearGradient id={id('r')} x1="0" y1="0" x2="0" y2="1"><stop offset="0" style={{ stopColor: 'rgb(var(--c-accent-500))' }} /><stop offset="1" style={{ stopColor: 'rgb(var(--c-accent-700))' }} /></linearGradient>
       </defs>
       <g transform="translate(0 -1.5)">
       <polygon points="9,17 24,25 24,41 9,33" fill={`url(#${id('l')})`} />
       <polygon points="39,17 24,25 24,41 39,33" fill={`url(#${id('r')})`} />
       <polygon points="24,9 39,17 24,25 9,17" fill={`url(#${id('t')})`} />
-      <polygon points="18.500,12 33.500,20 29.500,22.200 14.500,14.200" fill="#f0fff6" fillOpacity=".75" />
+      <polygon points="18.500,12 33.500,20 29.500,22.200 14.500,14.200" fillOpacity=".75" style={{ fill: 'rgb(var(--c-accent-50))' }} />
       </g>
     </>
   ),
@@ -118,7 +118,7 @@ export function InstanceIcon({ icon, size = 48, className = '' }: { icon: string
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" className={className}>
       <defs>
-        <linearGradient id={id('bg')} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#1b2b20" /><stop offset="1" stopColor="#0a110c" /></linearGradient>
+        <linearGradient id={id('bg')} x1="0" y1="0" x2="1" y2="1"><stop offset="0" style={{ stopColor: 'rgb(var(--c-ink-700))' }} /><stop offset="1" style={{ stopColor: 'rgb(var(--c-ink-900))' }} /></linearGradient>
       </defs>
       <rect width="48" height="48" rx="12" fill={`url(#${id('bg')})`} />
       <rect x=".75" y=".75" width="46.500" height="46.500" rx="11.250" fill="none" stroke="#ffffff" strokeOpacity=".09" strokeWidth="1.500" />

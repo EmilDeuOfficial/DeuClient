@@ -12,6 +12,7 @@ import { Icon, type IconName } from '../components/Icons';
 import { InstanceIcon } from '../components/InstanceIcon';
 import { useApp } from '../store';
 import { InstanceEditor } from './Instances';
+import { GAME_MODE_KEYS, WorldEditor } from './WorldEditor';
 
 export function formatPlayTime(ms?: number): string {
   if (!ms) return '0 min';
@@ -298,9 +299,26 @@ function Overview({ inst, onTab }: { inst: Instance; onTab: (t: Tab) => void }) 
 }
 
 function Worlds({ inst }: { inst: Instance }) {
-  const { t } = useApp();
+  const { t, game, toast } = useApp();
   const [worlds, setWorlds] = useState<WorldInfo[] | null>(null);
-  useEffect(() => void api.instances.worlds(inst.id).then(setWorlds), [inst.id]);
+  const [editing, setEditing] = useState<WorldInfo | null>(null);
+  const reload = useCallback(() => void api.instances.worlds(inst.id).then(setWorlds), [inst.id]);
+  useEffect(reload, [reload, game.running]);
+  // solange dieses Modpack läuft, gehören die Welten dem Spiel
+  const busy = game.running && game.instanceId === inst.id;
+
+  const remove = async (w: WorldInfo) => {
+    const message = t('world.confirmDelete').replace('{name}', w.name);
+    if (!(await confirmDialog(message, { danger: true, confirmLabel: t('inst.delete') }))) return;
+    try {
+      await api.instances.deleteWorld(inst.id, w.folder);
+      toast(`${w.name} ✓`, 'success');
+    } catch (e) {
+      toast((e as Error).message, 'error');
+    }
+    reload();
+  };
+
   return (
     <div className="card overflow-hidden">
       <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-3.5">
@@ -309,6 +327,7 @@ function Worlds({ inst }: { inst: Instance }) {
           <Icon name="folder" size={13} /> {t('mods.openFolder')}
         </button>
       </div>
+      {busy && <div className="border-b border-white/[0.06] px-5 py-2.5 text-xs text-amber-200/80">{t('world.busy')}</div>}
       {worlds && !worlds.length && <div className="py-14 text-center text-sm text-ink-200/50">{t('pack.noWorlds')}</div>}
       <div className="divide-y divide-white/[0.05]">
         {worlds?.map((w) => (
@@ -316,11 +335,26 @@ function Worlds({ inst }: { inst: Instance }) {
             {w.icon ? <img src={w.icon} alt="" className="h-12 w-12 rounded-lg" style={{ imageRendering: 'pixelated' }} /> : <InstanceIcon icon="grass" size={48} />}
             <div className="min-w-0 flex-1">
               <div className="truncate font-semibold">{w.name}</div>
-              <div className="text-xs text-ink-200/50">{new Date(w.lastPlayed).toLocaleString()} · {w.sizeMb} MB</div>
+              <div className="text-xs text-ink-200/50">
+                {new Date(w.lastPlayed).toLocaleString()} · {w.sizeMb} MB
+                {w.hardcore ? ` · ${t('world.hardcore')}` : w.gameMode !== undefined && GAME_MODE_KEYS[w.gameMode] ? ` · ${t(GAME_MODE_KEYS[w.gameMode])}` : ''}
+              </div>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <button className="btn-ghost !py-1.5 text-xs" disabled={busy} onClick={() => setEditing(w)}>
+                <Icon name="edit" size={13} /> {t('world.editShort')}
+              </button>
+              <button className="btn-icon !h-8 !w-8" title={t('mods.openFolder')} onClick={() => api.instances.openFolder(inst.id, `saves/${w.folder}`)}>
+                <Icon name="folder" size={14} />
+              </button>
+              <button className="btn-icon !h-8 !w-8 hover:!text-red-300" title={t('inst.delete')} disabled={busy} onClick={() => void remove(w)}>
+                <Icon name="trash" size={14} />
+              </button>
             </div>
           </div>
         ))}
       </div>
+      <WorldEditor instanceId={inst.id} world={editing} onClose={() => setEditing(null)} onSaved={reload} />
     </div>
   );
 }

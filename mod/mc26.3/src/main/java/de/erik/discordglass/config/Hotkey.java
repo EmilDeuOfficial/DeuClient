@@ -59,11 +59,11 @@ public class Hotkey {
 
    public String describe() {
       if (!this.isBound()) {
-         return "Nicht belegt";
+         return eu.deusmp.deucore.Tr.t("Nicht belegt");
       } else {
          StringBuilder sb = new StringBuilder();
          if (this.ctrl) {
-            sb.append("Strg + ");
+            sb.append(eu.deusmp.deucore.Tr.t("Strg")).append(" + ");
          }
 
          if (this.shift) {

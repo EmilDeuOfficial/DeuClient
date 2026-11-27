@@ -81,3 +81,11 @@ Design wings so that this looks good: joints at the elbow and wrist, feathers fa
 * `smaragd`: DeuClient signature: emerald crystal blade feathers, green gradient, bright facet highlights.
 
 Rules for the repo: no emojis in code or docs, use short hyphens only (never long dashes).
+
+Nach jedem Lauf eines Generators: `node tools/wings/postprocess.cjs` (Federn unter die Arme, engel-Glow, Eisdeckel).
+Danach `node tools/wings/postprocess2.cjs` (Rueckenanschluss) und `node tools/wings/pairs.cjs` (Paar-Ansicht).
+Danach `node tools/wings/postprocess3.cjs` (kein engel-Glow, kein Flackern an Gelenken), dann `node tools/wings/pairs.cjs`.
+
+## Animations (elytra replacement)
+
+`node tools/wings/animations.cjs` writes the Blockbench animations `stehen`, `schleichen`, `gleiten`, `schlagen`, `sturz` into every model (rotation keyframes, groups by uuid; `stehen` and `schleichen` match the normal wings). The mod plays them when the player wears an elytra and chose wings in the cosmetics menu. Run it after the postprocess scripts, then `pairs.cjs`. It overwrites manual animation edits.

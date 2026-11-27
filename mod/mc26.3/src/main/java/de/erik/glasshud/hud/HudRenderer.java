@@ -20,12 +20,24 @@ public final class HudRenderer {
       return BOUNDS.get(id);
    }
 
+   /** Flaechen aller zuletzt gezeichneten Anzeigen */
+   public static java.util.Collection<HudRenderer.Rect> allBounds() {
+      return BOUNDS.values();
+   }
+
    public static int[] resolve(HudConfig.W wc, int sw, int sh, int screenW, int screenH) {
       int x = wc.ax * (screenW - sw) / 2 + wc.offX;
       int y = wc.ay * (screenH - sh) / 2 + wc.offY;
       x = Math.max(0, Math.min(Math.max(0, screenW - sw), x));
       y = Math.max(0, Math.min(Math.max(0, screenH - sh), y));
       return new int[]{x, y};
+   }
+
+   /** Gewuenschte Groesse auf Viertelschritte der Gesamtskalierung runden: dafuer gibt es je eine scharfe Schrift */
+   public static float snapScale(float wanted) {
+      float s = Math.max(0.5F, Math.min(3.0F, wanted));
+      double gs = Minecraft.getInstance().getWindow().getGuiScale();
+      return gs > 0 ? (float)(Math.max(4L, Math.round(gs * s * 4.0)) / (4.0 * gs)) : s;
    }
 
    public static void renderAll(GuiGraphicsExtractor g, Minecraft mc, boolean editor) {
@@ -48,7 +60,7 @@ public final class HudRenderer {
                Widget.Ctx c = new Widget.Ctx(g, mc.font, d, op, editor, wc);
                int[] sz = wd.measure(c);
                if (sz[0] > 0 && sz[1] > 0) {
-                  float s = Math.max(0.5F, Math.min(3.0F, wc.scale));
+                  float s = snapScale(wc.scale);
                   int ws = Math.round(sz[0] * s);
                   int hs = Math.round(sz[1] * s);
                   int[] pos = resolve(wc, ws, hs, screenW, screenH);
@@ -56,7 +68,14 @@ public final class HudRenderer {
                   g.pose().pushMatrix();
                   g.pose().translate(pos[0], pos[1]);
                   g.pose().scale(s, s);
-                  wd.draw(c, sz[0], sz[1]);
+                  de.erik.glasshud.gui.Glass.cardStyle = wc.bgStyle;
+                  de.erik.glasshud.gui.Glass.cardAlpha = 1.0F - Math.max(0, Math.min(100, wc.bgTransparency)) / 100.0F;
+                  try {
+                     wd.draw(c, sz[0], sz[1]);
+                  } finally {
+                     de.erik.glasshud.gui.Glass.cardStyle = 1;
+                     de.erik.glasshud.gui.Glass.cardAlpha = 1.0F;
+                  }
                   g.pose().popMatrix();
                }
             }

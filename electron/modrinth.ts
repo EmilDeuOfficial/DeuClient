@@ -96,12 +96,14 @@ export async function install(
   type: ContentType,
   versionId?: string,
   onProgress?: (e: ProgressEvent) => void,
+  /** Dependencies, die schon als Datei vorhanden sind und nicht geladen werden sollen */
+  provided: string[] = [],
 ): Promise<InstallResult> {
   const inst = getInstance(instanceId);
   const idx = loadIndex(instanceId);
   const result: InstallResult = { installed: [], skipped: [] };
   const visited = new Set<string>();
-  const installedProjects = new Set(Object.values(idx).map((e) => e.projectId));
+  const installedProjects = new Set([...Object.values(idx).map((e) => e.projectId), ...provided]);
 
   const installOne = async (pid: string, vid: string | undefined, contentType: ContentType, isDependency: boolean) => {
     if (visited.has(pid)) return;
@@ -282,6 +284,77 @@ export async function ensureFabricApi(instanceId: string): Promise<void> {
   const modsDir = path.join(instanceDir(instanceId), 'mods');
   if (fs.existsSync(modsDir) && fs.readdirSync(modsDir).some((f) => /^fabric-api/i.test(f))) return;
   await install(instanceId, FABRIC_API_ID, 'mod').catch(() => undefined);
+}
+
+/* ---------------- Vorinstallierte Leistungs-Mods ---------------- */
+
+/** In jedem Fabric-Modpack vorinstalliert: Mod-Id (fabric.mod.json) und Modrinth-Projekt */
+const PERFORMANCE_MODS = [
+  { modId: 'sodium', projectId: 'AANobbMI' },
+  { modId: 'lithium', projectId: 'gvQqBUqZ' },
+  { modId: 'ferritecore', projectId: 'uXXizFIs' },
+  { modId: 'immediatelyfast', projectId: '5ZwdcRci' },
+  { modId: 'entityculling', projectId: 'NNAgCjsB' },
+];
+
+/** Mod-Ids aller Jars im mods-Ordner (auch deaktivierter) */
+function presentModIds(modsDir: string): Set<string> {
+  const ids = new Set<string>();
+  if (!fs.existsSync(modsDir)) return ids;
+  for (const file of fs.readdirSync(modsDir)) {
+    if (!/\.jar(\.disabled)?$/i.test(file)) continue;
+    try {
+      const entry = new AdmZip(path.join(modsDir, file)).getEntry('fabric.mod.json');
+      const id = entry && (JSON.parse(entry.getData().toString('utf8')) as { id?: string }).id;
+      if (id) ids.add(id);
+    } catch {
+      // nicht lesbar: am Dateinamen erkennen (z. B. "sodium-fabric-…", aber nicht "sodium-extra-…")
+      const hit = PERFORMANCE_MODS.find((m) => new RegExp(`^${m.modId}(-fabric)?[-_]\\d|^${m.modId}-fabric`, 'i').test(file));
+      if (hit) ids.add(hit.modId);
+    }
+  }
+  return ids;
+}
+
+async function installEssentials(instanceId: string, onProgress?: (e: ProgressEvent) => void): Promise<string[]> {
+  await ensureFabricApi(instanceId);
+  const inst = getInstance(instanceId);
+  if (inst.loader !== 'fabric' || inst.noDeu) return [];
+  // Was einmal vorhanden war, wird nicht erneut installiert: so bleibt eine gelöschte Mod gelöscht
+  const handledFile = path.join(instanceDir(instanceId), 'deu-preinstalled.json');
+  const handled = new Set(readJson<string[]>(handledFile, []));
+  const missing = PERFORMANCE_MODS.filter((m) => !handled.has(m.projectId));
+  if (!missing.length) return [];
+
+  const modsDir = path.join(instanceDir(instanceId), 'mods');
+  const present = presentModIds(modsDir);
+  const indexed = new Set(Object.values(loadIndex(instanceId)).map((e) => e.projectId));
+  const provided = present.has('fabric-api') ? [FABRIC_API_ID] : [];
+  const added: string[] = [];
+  for (const mod of missing) {
+    if (!present.has(mod.modId) && !indexed.has(mod.projectId)) {
+      try {
+        added.push(...(await install(instanceId, mod.projectId, 'mod', undefined, onProgress, provided)).installed);
+      } catch {
+        continue; // offline oder noch keine passende Version: beim nächsten Start erneut versuchen
+      }
+    }
+    handled.add(mod.projectId);
+  }
+  writeJson(handledFile, [...handled]);
+  return added;
+}
+
+const essentialQueue = new Map<string, Promise<unknown>>();
+
+/** Fabric API und Leistungs-Mods sicherstellen. Liefert die Namen neu installierter Mods. */
+export function ensureEssentials(instanceId: string, onProgress?: (e: ProgressEvent) => void): Promise<string[]> {
+  // je Modpack nacheinander: Erstellen und Start schreiben denselben Mod-Index
+  const run = (essentialQueue.get(instanceId) ?? Promise.resolve())
+    .catch(() => undefined)
+    .then(() => installEssentials(instanceId, onProgress));
+  essentialQueue.set(instanceId, run);
+  return run;
 }
 
 /* ---------------- .mrpack-Import ---------------- */

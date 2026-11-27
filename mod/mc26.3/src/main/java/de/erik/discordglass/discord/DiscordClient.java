@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 
 public final class DiscordClient {
-   private static final String[] OWN_APP_SCOPES = new String[]{"rpc", "rpc.voice.read", "rpc.voice.write", "rpc.notifications.read", "identify"};
+   private static final String[] OWN_APP_SCOPES = new String[]{"rpc", "rpc.voice.read", "rpc.voice.write", "rpc.notifications.read", "identify", "messages.read"};
    public static final String STREAMKIT_CLIENT_ID = "207646673902501888";
    private static final String[] STREAMKIT_SCOPES = new String[]{"rpc", "messages.read", "rpc.notifications.read"};
    private static final long RETRY_MS = 5000L;
@@ -42,6 +42,8 @@ public final class DiscordClient {
    private volatile String subscribedChannel;
    private final long sessionStart = System.currentTimeMillis() / 1000L;
    private volatile String lastActivity = "";
+   /** Stummschaltung ohne Taubschalten: gilt wieder, sobald der Ton angeht */
+   private volatile boolean muteWithoutDeaf;
 
    private DiscordClient() {
    }
@@ -60,7 +62,7 @@ public final class DiscordClient {
       if (!this.isRunning()) {
          if (GlassConfig.get().useOwnApp && GlassConfig.get().clientId.isBlank()) {
             this.state.status = DiscordState.Status.ERROR;
-            this.state.statusDetail = "Eigene App aktiv, aber keine App-ID eingetragen";
+            this.state.statusDetail = eu.deusmp.deucore.Tr.t("Eigene App aktiv, aber keine App-ID eingetragen");
             this.wantConnected = false;
          } else {
             Thread t = new Thread(this::run, "DiscordGlass-IPC");
@@ -108,7 +110,11 @@ public final class DiscordClient {
    public void toggleMute() {
       if (this.isConnected()) {
          JsonObject a = new JsonObject();
-         a.addProperty("mute", !this.state.selfMute);
+         boolean mute = !this.state.selfMute;
+         a.addProperty("mute", mute);
+         if (!mute && this.state.selfDeaf) {
+            a.addProperty("deaf", false); // wie in Discord: Mikrofon an hebt auch Taub auf
+         }
          this.command("SET_VOICE_SETTINGS", a, (d, err) -> {
             if (!err) {
                this.applyVoiceSettings(d);
@@ -120,7 +126,9 @@ public final class DiscordClient {
    public void toggleDeafen() {
       if (this.isConnected()) {
          JsonObject a = new JsonObject();
-         a.addProperty("deaf", !this.state.selfDeaf);
+         boolean deaf = !this.state.selfDeaf;
+         a.addProperty("deaf", deaf);
+         a.addProperty("mute", deaf || this.muteWithoutDeaf);
          this.command("SET_VOICE_SETTINGS", a, (d, err) -> {
             if (!err) {
                this.applyVoiceSettings(d);
@@ -136,7 +144,7 @@ public final class DiscordClient {
          a.addProperty("force", true);
          this.command("SELECT_VOICE_CHANNEL", a, (d, err) -> {
             if (err) {
-               this.state.pushNotification("Beitreten fehlgeschlagen", str(d, "message"));
+               this.state.pushNotification(eu.deusmp.deucore.Tr.t("Beitreten fehlgeschlagen"), str(d, "message"));
             }
          });
       }
@@ -175,19 +183,257 @@ public final class DiscordClient {
          this.command("GET_CHANNELS", a, (d, err) -> {
             if (!err) {
                List<DiscordState.Channel> list = new ArrayList<>();
+               List<DiscordState.Channel> text = new ArrayList<>();
 
                for (JsonElement e : arr(d, "channels")) {
                   JsonObject c = e.getAsJsonObject();
                   int type = c.has("type") ? c.get("type").getAsInt() : 0;
                   if (type == 2 || type == 13) {
                      list.add(new DiscordState.Channel(str(c, "id"), str(c, "name"), type));
+                  } else if (type == 0 || type == 5) {
+                     text.add(new DiscordState.Channel(str(c, "id"), str(c, "name"), type));
                   }
                }
 
                this.state.channelsByGuild.put(guildId, list);
+               this.state.textByGuild.put(guildId, text);
             }
          });
       }
+   }
+
+   /** Icon eines Servers erfragen (je Server einmal) */
+   public void loadGuildIcon(String guildId) {
+      if (this.isConnected() && this.state.guildIcons.putIfAbsent(guildId, "") == null) {
+         JsonObject a = new JsonObject();
+         a.addProperty("guild_id", guildId);
+         this.command("GET_GUILD", a, (d, err) -> {
+            if (!err) {
+               this.state.guildIcons.put(guildId, str(d, "icon_url"));
+            }
+         });
+      }
+   }
+
+   /* ---------------- Text: lesen (Senden erlaubt Discord anderen Programmen nicht) ---------------- */
+
+   private static final String[] MESSAGE_EVENTS = new String[]{"MESSAGE_CREATE", "MESSAGE_UPDATE", "MESSAGE_DELETE"};
+
+   public void openText(String channelId, String name, String guildId) {
+      if (!this.isConnected()) {
+         return;
+      }
+
+      this.unsubscribeText();
+      this.state.closeText();
+      this.state.textChannelId = channelId;
+      this.state.textChannelName = name;
+      this.state.textGuildId = guildId;
+      this.state.textStatus = eu.deusmp.deucore.Tr.t("Nachrichten werden geladen…");
+      JsonObject a = new JsonObject();
+      a.addProperty("channel_id", channelId);
+      this.command("GET_CHANNEL", a, (d, err) -> {
+         if (!channelId.equals(this.state.textChannelId)) {
+            return;
+         }
+
+         if (err) {
+            this.state.textStatus = eu.deusmp.deucore.Tr.t("Nachrichten nicht lesbar");
+            return;
+         }
+
+         List<DiscordState.Message> list = new ArrayList<>();
+
+         for (JsonElement e : arr(d, "messages")) {
+            if (e.isJsonObject()) {
+               DiscordState.Message m = message(e.getAsJsonObject());
+               if (m != null) {
+                  list.add(m);
+               }
+            }
+         }
+
+         list.sort(java.util.Comparator.comparingLong(DiscordState.Message::time));
+         this.state.messages.clear();
+         this.state.messages.addAll(list);
+         this.state.textStatus = "";
+
+         for (String evt : MESSAGE_EVENTS) {
+            this.subscribe(evt, a, true);
+         }
+      });
+   }
+
+   public void closeText() {
+      this.unsubscribeText();
+      this.state.closeText();
+   }
+
+   private void unsubscribeText() {
+      String open = this.state.textChannelId;
+      if (open != null) {
+         JsonObject a = new JsonObject();
+         a.addProperty("channel_id", open);
+
+         for (String evt : MESSAGE_EVENTS) {
+            this.subscribe(evt, a, false);
+         }
+      }
+   }
+
+   /** Zeigt die Unterhaltung in der Discord-App und holt diese nach vorn (dort kann man schreiben) */
+   public void openInDiscord(String channelId, String guildId) {
+      if (this.isConnected()) {
+         JsonObject a = new JsonObject();
+         a.addProperty("channel_id", channelId);
+         this.command("SELECT_TEXT_CHANNEL", a, null);
+      }
+
+      String guild = guildId == null ? "@me" : guildId;
+      if (channelId.matches("\\d+") && guild.matches("\\d+|@me")) {
+         this.openLink("discord://-/channels/" + guild + "/" + channelId);
+      }
+   }
+
+   /** Zeigt das Profil in der Discord-App; dort kann man anschreiben und anrufen */
+   public void openProfile(String userId) {
+      if (userId.matches("\\d+")) {
+         this.openLink("discord://-/users/" + userId);
+      }
+   }
+
+   /** Nur mit geprueften Kennungen aufrufen: Windows oeffnet die Adresse mit der Discord-App */
+   private void openLink(String link) {
+      try {
+         new ProcessBuilder("rundll32", "url.dll,FileProtocolHandler", link).start();
+      } catch (IOException e) {
+         this.state.pushNotification(eu.deusmp.deucore.Tr.t("Discord ließ sich nicht öffnen"), "");
+      }
+   }
+
+   private static String avatarUrl(JsonObject user) {
+      String id = str(user, "id");
+      String hash = str(user, "avatar");
+      return id.matches("\\d+") && hash.matches("\\w+") ? "https://cdn.discordapp.com/avatars/" + id + "/" + hash + ".png" : "";
+   }
+
+   /** Eine Nachricht aus Discord; null, wenn sie nichts Anzeigbares enthaelt (z. B. Systemmeldungen) */
+   private static DiscordState.Message message(JsonObject m) {
+      JsonObject author = obj(m, "author");
+      String text = readable(str(m, "content").replace("\u0001", ""), arr(m, "mentions"));
+      if (arr(m, "attachments").size() > 0 || arr(m, "embeds").size() > 0 && text.isEmpty()) {
+         text = (text.isEmpty() ? "" : text + " ") + "[" + DiscordState.placeholder("Anhang") + "]";
+      }
+
+      if (arr(m, "sticker_items").size() > 0) {
+         text = (text.isEmpty() ? "" : text + " ") + "[Sticker]";
+      }
+
+      if (text.isEmpty()) {
+         return null;
+      }
+
+      long time;
+      try {
+         time = java.time.OffsetDateTime.parse(str(m, "timestamp")).toInstant().toEpochMilli();
+      } catch (Exception e) {
+         time = System.currentTimeMillis();
+      }
+
+      String nick = str(m, "nick");
+      return new DiscordState.Message(str(m, "id"), str(author, "id"), nick.isEmpty() ? displayName(author, "?") : nick, avatarUrl(author), text, time);
+   }
+
+   private static final java.util.regex.Pattern MENTION = java.util.regex.Pattern.compile("<(@!?|@&|#|a?:\\w+:)(\\d+)>");
+
+   /** Discords Platzhalter fuer Erwaehnungen und eigene Emojis in lesbaren Text */
+   private static String readable(String content, JsonArray mentions) {
+      java.util.regex.Matcher m = MENTION.matcher(content);
+      StringBuilder out = new StringBuilder();
+
+      while (m.find()) {
+         String kind = m.group(1);
+         String shown;
+         if (kind.equals("@&")) {
+            shown = "@" + DiscordState.placeholder("Rolle");
+         } else if (kind.equals("#")) {
+            shown = "#" + DiscordState.placeholder("Kanal");
+         } else if (kind.startsWith("@")) {
+            shown = "@" + DiscordState.placeholder("jemand");
+            for (JsonElement e : mentions) {
+               if (e.isJsonObject() && str(e.getAsJsonObject(), "id").equals(m.group(2))) {
+                  shown = "@" + displayName(e.getAsJsonObject(), "?").replace("\u0001", "");
+               }
+            }
+         } else {
+            shown = kind.substring(kind.indexOf(':')); // :name:
+         }
+
+         m.appendReplacement(out, java.util.regex.Matcher.quoteReplacement(shown));
+      }
+
+      m.appendTail(out);
+      return out.toString().strip();
+   }
+
+   private void onMessage(String evt, JsonObject data) {
+      if (!str(data, "channel_id").equals(this.state.textChannelId)) {
+         return;
+      }
+
+      JsonObject raw = obj(data, "message");
+      String id = str(raw, "id");
+      if (evt.equals("MESSAGE_DELETE")) {
+         this.state.messages.removeIf(x -> x.id().equals(id));
+         return;
+      }
+
+      DiscordState.Message m = message(raw);
+      if (m == null) {
+         return;
+      }
+
+      for (int i = 0; i < this.state.messages.size(); i++) {
+         if (this.state.messages.get(i).id().equals(id)) {
+            this.state.messages.set(i, m);
+            return;
+         }
+      }
+
+      if (evt.equals("MESSAGE_CREATE")) {
+         this.state.messages.add(m);
+
+         while (this.state.messages.size() > 100) {
+            this.state.messages.remove(0);
+         }
+      }
+   }
+
+   /** Direktnachrichten aus Benachrichtigungen kommen in die Freundesliste, damit man sie oeffnen und anrufen kann */
+   private void rememberDirectChat(JsonObject data) {
+      String channel = str(data, "channel_id");
+      if (channel.isEmpty()) {
+         return;
+      }
+
+      String title = str(data, "title");
+      String icon = str(data, "icon_url");
+      JsonObject author = obj(obj(data, "message"), "author");
+      JsonObject a = new JsonObject();
+      a.addProperty("channel_id", channel);
+      this.command("GET_CHANNEL", a, (d, err) -> {
+         int type = !err && d.has("type") ? d.get("type").getAsInt() : -1;
+         if (type == 1 || type == 3) { // Direktnachricht oder Gruppe
+            String user = type == 1 && !str(author, "id").equals(this.state.userId) ? str(author, "id") : "";
+            String name = str(d, "name");
+            if (name.isEmpty()) {
+               name = user.isEmpty() ? title : displayName(author, title);
+            }
+
+            String picture = user.isEmpty() || avatarUrl(author).isEmpty() ? icon : avatarUrl(author);
+            GlassConfig.get().rememberFriend(channel, user, name, picture, true);
+         }
+      });
    }
 
    public void updateActivity(String details, String stateText) {
@@ -228,7 +474,7 @@ public final class DiscordClient {
                this.pipe = IpcPipe.open();
             } catch (IOException var10) {
                this.state.status = DiscordState.Status.WAITING;
-               this.state.statusDetail = "Öffne Discord – die Mod verbindet sich automatisch.";
+               this.state.statusDetail = eu.deusmp.deucore.Tr.t("Öffne Discord, die Mod verbindet sich automatisch.");
                return;
             }
 
@@ -248,7 +494,7 @@ public final class DiscordClient {
                         break;
                      case 2:
                         JsonObject o = JsonParser.parseString(f.json()).getAsJsonObject();
-                        throw new IOException("Discord hat die Verbindung geschlossen: " + str(o, "message"));
+                        throw new IOException(eu.deusmp.deucore.Tr.t("Discord hat die Verbindung geschlossen") + ": " + str(o, "message"));
                      case 3:
                         this.pipe.write(4, f.json());
                   }
@@ -260,7 +506,7 @@ public final class DiscordClient {
          } catch (Exception var12) {
             if (this.wantConnected) {
                this.state.status = DiscordState.Status.ERROR;
-               this.state.statusDetail = var12.getMessage() == null ? var12.toString() : var12.getMessage();
+               this.state.statusDetail = var12.getMessage() == null ? var12.toString() : eu.deusmp.deucore.Tr.t(var12.getMessage());
                return;
             }
          }
@@ -285,6 +531,8 @@ public final class DiscordClient {
       this.pending.clear();
       this.subscribedChannel = null;
       this.lastActivity = "";
+      this.state.closeText();
+      this.state.guildIcons.values().removeIf(String::isEmpty); // noch einmal fragen
    }
 
    private void send(JsonObject payload) {
@@ -294,7 +542,7 @@ public final class DiscordClient {
             p.write(1, payload.toString());
          } catch (IOException var4) {
             this.state.status = DiscordState.Status.ERROR;
-            this.state.statusDetail = "Senden fehlgeschlagen: " + var4.getMessage();
+            this.state.statusDetail = eu.deusmp.deucore.Tr.t("Senden fehlgeschlagen") + ": " + var4.getMessage();
             this.closePipe();
          }
       }
@@ -363,7 +611,13 @@ public final class DiscordClient {
                   m.lastSpoke = System.currentTimeMillis();
                }
                break;
+            case "MESSAGE_CREATE":
+            case "MESSAGE_UPDATE":
+            case "MESSAGE_DELETE":
+               this.onMessage(evt, data);
+               break;
             case "NOTIFICATION_CREATE":
+               this.rememberDirectChat(data);
                if (GlassConfig.get().notifications) {
                   this.state.pushNotification(str(data, "title"), str(data, "body"));
                }
@@ -393,10 +647,10 @@ public final class DiscordClient {
       boolean own = ownApp();
       if (own && cfg.clientSecret.isBlank()) {
          this.state.status = DiscordState.Status.ERROR;
-         this.state.statusDetail = "Client-Secret fehlt (Einstellungen → Eigene App)";
+         this.state.statusDetail = eu.deusmp.deucore.Tr.t("Client-Secret fehlt (Einstellungen, Eigene Discord-App)");
       } else {
          this.state.status = DiscordState.Status.AUTHORIZING;
-         this.state.statusDetail = "Ein Fenster in Discord wartet auf deine Bestätigung";
+         this.state.statusDetail = eu.deusmp.deucore.Tr.t("Ein Fenster in Discord wartet auf deine Bestätigung");
          JsonObject a = new JsonObject();
          a.addProperty("client_id", clientId());
          JsonArray scopes = new JsonArray();
@@ -409,7 +663,7 @@ public final class DiscordClient {
          this.command("AUTHORIZE", a, (d, err) -> {
             if (err) {
                this.state.status = DiscordState.Status.ERROR;
-               this.state.statusDetail = "Autorisierung abgelehnt: " + str(d, "message");
+               this.state.statusDetail = eu.deusmp.deucore.Tr.t("Autorisierung abgelehnt") + ": " + str(d, "message");
             } else {
                String code = str(d, "code");
                if (own) {
@@ -446,7 +700,7 @@ public final class DiscordClient {
          this.authenticate(cfg.accessToken, false);
       } catch (Exception var7) {
          this.state.status = DiscordState.Status.ERROR;
-         this.state.statusDetail = "Anmeldung fehlgeschlagen (" + var7.getMessage() + "). Versuche es erneut oder nutze eine eigene App.";
+         this.state.statusDetail = eu.deusmp.deucore.Tr.t("Anmeldung fehlgeschlagen") + " (" + var7.getMessage() + "). " + eu.deusmp.deucore.Tr.t("Versuche es erneut oder nutze eine eigene App.");
       }
    }
 
@@ -489,7 +743,7 @@ public final class DiscordClient {
             this.authorize();
          } else {
             this.state.status = DiscordState.Status.ERROR;
-            this.state.statusDetail = "Token-Tausch fehlgeschlagen: " + var8.getMessage();
+            this.state.statusDetail = eu.deusmp.deucore.Tr.t("Token-Tausch fehlgeschlagen") + ": " + var8.getMessage();
          }
       }
    }
@@ -541,12 +795,19 @@ public final class DiscordClient {
    }
 
    private void applyVoiceSettings(JsonObject d) {
-      if (d.has("mute") && !d.get("mute").isJsonNull()) {
-         this.state.selfMute = d.get("mute").getAsBoolean();
-      }
-
       if (d.has("deaf") && !d.get("deaf").isJsonNull()) {
          this.state.selfDeaf = d.get("deaf").getAsBoolean();
+      }
+
+      if (d.has("mute") && !d.get("mute").isJsonNull()) {
+         this.state.selfMute = d.get("mute").getAsBoolean();
+         if (!this.state.selfDeaf) {
+            this.muteWithoutDeaf = this.state.selfMute;
+         }
+      }
+
+      if (this.state.selfDeaf) {
+         this.state.selfMute = true;
       }
    }
 
@@ -569,6 +830,7 @@ public final class DiscordClient {
       String id = str(ch, "id");
       this.state.clearMembers();
       this.state.channelId = id;
+      this.state.channelType = ch.has("type") && !ch.get("type").isJsonNull() ? ch.get("type").getAsInt() : -1;
       this.state.channelName = str(ch, "name");
       String guildId = str(ch, "guild_id");
       this.state.guildId = guildId.isEmpty() ? null : guildId;
@@ -579,6 +841,10 @@ public final class DiscordClient {
       }
 
       this.setChannelSubscriptions(id);
+      if (this.state.channelType == 3 && !str(ch, "name").isEmpty()) {
+         GlassConfig.get().rememberFriend(id, "", str(ch, "name"), "", false);
+      }
+
       if (!guildId.isEmpty()) {
          JsonObject a = new JsonObject();
          a.addProperty("guild_id", guildId);
@@ -588,7 +854,7 @@ public final class DiscordClient {
             }
          });
       } else {
-         this.state.guildName = "Direktanruf";
+         this.state.guildName = eu.deusmp.deucore.Tr.t("Direktanruf");
       }
    }
 
@@ -621,11 +887,17 @@ public final class DiscordClient {
       if (!id.isEmpty()) {
          String nick = str(vs, "nick");
          DiscordState.Member m = this.state.member(id, nick.isEmpty() ? displayName(user, id) : nick);
+         m.avatar = avatarUrl(user);
          JsonObject v = obj(vs, "voice_state");
          m.selfMute = bool(v, "self_mute");
          m.selfDeaf = bool(v, "self_deaf");
          m.serverMute = bool(v, "mute") || bool(v, "suppress");
          m.serverDeaf = bool(v, "deaf");
+         String channel = this.state.channelId;
+         if (this.state.channelType == 1 && channel != null && !id.equals(this.state.userId)) { // Direktanruf
+            GlassConfig.get().rememberFriend(channel, id, displayName(user, m.name), m.avatar, false);
+         }
+
          if (id.equals(this.state.userId)) {
             this.state.selfMute = m.selfMute || m.selfDeaf;
             this.state.selfDeaf = m.selfDeaf;

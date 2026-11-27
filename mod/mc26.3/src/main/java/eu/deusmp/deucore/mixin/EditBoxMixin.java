@@ -22,7 +22,7 @@ public abstract class EditBoxMixin {
             return;
         }
         boolean focused = ((AbstractWidget) (Object) this).isFocused();
-        DeuRender.roundRect(g, x, y, w, h, 3, 0xE10A0F0C);
-        DeuRender.roundOutline(g, x, y, w, h, 3, focused ? 0xFF2EFF7A : 0x602A332E);
+        DeuRender.roundRect(g, x, y, w, h, 3, 0xE1121418);
+        DeuRender.roundOutline(g, x, y, w, h, 3, focused ? 0xFF2EFF7A : 0x602E3138);
     }
 }

@@ -85,7 +85,6 @@ public final class PotionsWidget extends Widget {
          float blink = low ? 0.55F + 0.45F * Glass.pulse(700L) : 1.0F;
          int tint = e.beneficial() ? e.color() : -41870;
          Glass.roundRect(g, 7, y, 18, 18, 5, Glass.withAlpha(tint, 56));
-         Glass.roundOutline(g, 7, y, 18, 18, 5, Glass.withAlpha(tint, 96));
          Identifier sp = sprite(e.holder());
          if (sp != null) {
             g.blitSprite(RenderPipelines.GUI_TEXTURED, sp, 7, y, 18, 18);

@@ -11,7 +11,7 @@ public final class Fx {
     private Fx() {}
 
     public static void text(GuiGraphicsExtractor g, Font font, String s, int x, int y, int color, boolean shadow) {
-        g.text(Ui.font(), Ui.ui(s), x, y, color, false); // kein Schatten im DeuClient-Stil
+        g.text(Ui.font(), Ui.ui(s, g), x, y, color, false); // kein Schatten im DeuClient-Stil
     }
 
     public static void text(GuiGraphicsExtractor g, Font font, FormattedCharSequence s, int x, int y, int color, boolean shadow) {

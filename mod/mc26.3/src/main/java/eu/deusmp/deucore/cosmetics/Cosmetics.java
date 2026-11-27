@@ -27,14 +27,25 @@ public final class Cosmetics {
 
     public record Item(String id, String name) {}
 
-    public static final List<Item> CAPES = List.of(
-            new Item("gold", "Gold"), new Item("nacht", "Sternennacht"),
-            new Item("flamme", "Flamme"), new Item("eis", "Eiskristall"), new Item("smaragd", "Smaragd"));
+    /** Zusammengehoerige Capes und Fluegel; im Menue und im Launcher-Shop ein einklappbarer Abschnitt */
+    public record Collection(String id, String name, List<Item> capes, List<Item> wings) {}
 
-    public static final List<Item> WINGS = List.of(
-            new Item("engel", "Engel"), new Item("daemon", "Dämon"),
-            new Item("eis", "Eis"), new Item("phoenix", "Phönix"), new Item("schatten", "Schatten"),
-            new Item("smaragd", "Smaragd"));
+    /** Neue Kollektionen hier anhaengen (und in src/pages/Shop.tsx) - Ids der Teile muessen eindeutig bleiben */
+    public static final List<Collection> COLLECTIONS = List.of(
+            new Collection("mythos", "Mythos-Kollektion",
+                    List.of(new Item("gold", "Gold"), new Item("nacht", "Sternennacht"),
+                            new Item("flamme", "Flamme"), new Item("eis", "Eiskristall"), new Item("smaragd", "Smaragd"),
+                            new Item("daemon", "Dämon")),
+                    List.of(new Item("engel", "Engel"), new Item("daemon", "Dämon"),
+                            new Item("eis", "Eis"), new Item("phoenix", "Phönix"), new Item("schatten", "Schatten"),
+                            new Item("smaragd", "Smaragd"))));
+
+    /** Name der neuesten Kollektion (Karte im Hauptmenue) */
+    public static final String COLLECTION = COLLECTIONS.getLast().name();
+
+    public static final List<Item> CAPES = COLLECTIONS.stream().flatMap(k -> k.capes().stream()).toList();
+
+    public static final List<Item> WINGS = COLLECTIONS.stream().flatMap(k -> k.wings().stream()).toList();
 
     /** Was ein Spieler trägt (leere Strings = nichts) */
     public record Loadout(String cape, String wings) {
@@ -69,6 +80,11 @@ public final class Cosmetics {
     /** Nutzt dieser Spieler den DeuClient? (man selbst immer) */
     public static boolean isDeuUser(UUID uuid) {
         return uuid != null && (isSelf(uuid) || REMOTE.containsKey(uuid));
+    }
+
+    /** Will dieser Spieler (nur man selbst, die Einstellung ist lokal) seine Fluegel statt der Elytra sehen? */
+    public static boolean wingsInsteadOfElytra(UUID uuid) {
+        return uuid != null && isSelf(uuid) && DeuConfig.get().elytraWings;
     }
 
     public static Loadout loadoutFor(UUID uuid) {

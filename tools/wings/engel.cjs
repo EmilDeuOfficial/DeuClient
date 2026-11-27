@@ -60,7 +60,7 @@ const C = {
   white: [255, 255, 255],
   pearl: [240, 241, 249],
   mist: [217, 221, 236],
-  shade: [163, 169, 200],
+  shade: [233, 237, 248],
   cream: [250, 241, 214],
   paleGold: [255, 233, 168],
   champagne: [250, 228, 160],
@@ -74,7 +74,7 @@ const C = {
 // ---------------------------------------------------------------------------------------------
 // arm chain (rest pose, XY plane). Bones are rotated cubes, the seg groups hold the pivots.
 // ---------------------------------------------------------------------------------------------
-const GS = 0.95; // global size factor of the arm and the feather tips (keeps the model inside the spec size)
+const GS = 0.88; // global size factor of the arm and the feather tips (keeps the model inside the spec size)
 const gs = (p) => [p[0] * GS, p[1] * GS];
 // the arm root sits 2 units out from the attach point so the shoulder gem never crosses the spine (mirrored pair)
 const J = { S: [2, 0], E: gs([5, 9.5]), W: gs([15.5, 14.2]), H: gs([22.5, 11.8]) };
@@ -158,8 +158,7 @@ function paintFeather(il, st) {
       const rel = ax / h; // 0 at shaft, 1 at edge
 
       // body: shaded root, white middle
-      let col = mix(C.shade, C.white, smooth(0.0, 0.34, t));
-      col = mix(col, C.pearl, 0.35 * (1 - smooth(0.2, 0.9, t)) * (0.4 + 0.6 * rel));
+      let col = mix(C.shade, C.white, smooth(0.0, 0.2, t));
       col = mix(col, C.mist, tone.dim);
       // pale gold towards the tip and the edges
       const g = tone.gold * smooth(0.5, 1.0, t) * (0.3 + 0.7 * Math.pow(rel, 1.6));
@@ -185,7 +184,6 @@ function paintFeather(il, st) {
       col = mix(col, C.shade, tone.rootShade * (1 - smooth(0.0, 0.28, t)));
 
       let a = 255 * cov;
-      a *= lerp(0.8, 1, smooth(0, 1.1, edge));
       const i = (y * pw + x) * 4;
       data[i] = clamp(Math.round(col[0]), 0, 255);
       data[i + 1] = clamp(Math.round(col[1]), 0, 255);
@@ -334,6 +332,7 @@ function addFeather(segIndex, root, z, theta, L, W, shapeName, tone, tag) {
     rotation: [0, 0, 0],
     faces: { north: il, south: il },
     z,
+    zf: z + FT / 2,
   });
   placed.push({ root, phi, W, L, z, il, shape: SHAPES[shapeName], order: placed.length });
 }
@@ -357,6 +356,7 @@ function addBone(si) {
     rotation: [0, 0, r2(s.ang)],
     faces: { north: side, south: side, up: lead, down: trail, east: capA, west: capB },
     z: ZB + 10,
+    zf: ZB + s.d / 2,
   });
   placed.push({ bone: true, c: [cx, cy], len, t: s.t, ang: s.ang, z: ZB + s.d / 2, il: side, order: placed.length });
 }
@@ -373,6 +373,7 @@ function addGemCube(name, parent, c, size, depth, big) {
     rotation: [0, 0, 45],
     faces: { north: il, south: il, up: side, down: side, east: side, west: side },
     z: ZB + 11,
+    zf: ZB + depth / 2,
   });
   placed.push({ gem: true, c, len: size, t: size, ang: 45, z: ZB + depth / 2 + 0.01, il, order: placed.length });
 }
@@ -384,13 +385,13 @@ const P_TIPS = [[32, 10.5], [33.4, 5], [33.6, -0.8], [31.8, -7], [28, -11.8], [2
 const S_TIPS = [[13.2, -10.5], [10, -7.5], [7.6, -4.5], [6, -1.5], [4.9, 1.5], [4.1, 4.2]].map(gs);
 
 const TONES = {
-  prim: { dim: 0.0, gold: 0.7, rim: 0.85, rimW: 1.2, barb: 0.035, rootShade: 0.55, sparkle: 1.2 },
-  sec: { dim: 0.0, gold: 0.45, rim: 0.8, rimW: 1.2, barb: 0.035, rootShade: 0.55, sparkle: 1.0 },
-  under: { dim: 0.5, gold: 0.35, rim: 0.55, rimW: 1.1, barb: 0.03, rootShade: 0.6, sparkle: 0.3 },
-  covC: { dim: 0.1, gold: 0.3, rim: 1.0, rimW: 1.25, barb: 0.025, rootShade: 0.5, sparkle: 0.8 },
-  covB: { dim: 0.0, gold: 0.28, rim: 1.0, rimW: 1.25, barb: 0.02, rootShade: 0.45, sparkle: 0.6 },
-  covA: { dim: 0.0, gold: 0.25, rim: 1.0, rimW: 1.15, barb: 0.015, rootShade: 0.4, sparkle: 0.3 },
-  alula: { dim: 0.0, gold: 0.4, rim: 1.0, rimW: 1.15, barb: 0.015, rootShade: 0.35, sparkle: 0.2 },
+  prim: { dim: 0.0, gold: 0.9, rim: 0.9, rimW: 1.2, barb: 0.015, rootShade: 0.12, sparkle: 1.2 },
+  sec: { dim: 0.0, gold: 0.65, rim: 0.85, rimW: 1.2, barb: 0.015, rootShade: 0.12, sparkle: 1.0 },
+  under: { dim: 0.05, gold: 0.55, rim: 0.8, rimW: 1.1, barb: 0.012, rootShade: 0.08, sparkle: 0.3 },
+  covC: { dim: 0.02, gold: 0.5, rim: 1.0, rimW: 1.25, barb: 0.01, rootShade: 0.2, sparkle: 0.8 },
+  covB: { dim: 0.0, gold: 0.45, rim: 1.0, rimW: 1.25, barb: 0.01, rootShade: 0.18, sparkle: 0.6 },
+  covA: { dim: 0.0, gold: 0.4, rim: 1.0, rimW: 1.15, barb: 0.008, rootShade: 0.15, sparkle: 0.3 },
+  alula: { dim: 0.0, gold: 0.6, rim: 1.0, rimW: 1.15, barb: 0.008, rootShade: 0.12, sparkle: 0.2 },
 };
 
 const flight = []; // {kind, segIndex, root, theta, L, W, s}
@@ -511,6 +512,13 @@ function inBone(b, X, Y) {
   return Math.abs(lx) <= b.len / 2 && Math.abs(ly) <= b.t / 2;
 }
 
+// The halo is a very soft pale-gold ring that floats OUTSIDE the wing: its alpha is exactly 0 inside the
+// silhouette (feathers, bones and gems) dilated by HALO.gap units, so it can never overlap a feather or the gold
+// arm. It is built from small tiles in two thin layers that share the same islands: one at the lowest z (behind
+// the feathers for a viewer behind the player) and one above the whole stack (behind the feathers for a viewer
+// in front of the player). The north faces use mirrored islands (the north face runs U towards -X).
+const HALO = { gap: 1.6, reach: 3.0, margin: 3.3, tile: 5.5, peak: 0.24, lo: [0.05, 0.25], hi: [5.3, 5.5] };
+
 function addGlow() {
   for (const f of placed) {
     const a = f.bone || f.gem ? f.ang : f.phi;
@@ -530,66 +538,93 @@ function addGlow() {
       }
     }
   }
-  const M = 1.8;
-  const x0 = Math.max(0.5, Math.floor(minX - M)); const x1 = Math.ceil(maxX + M);
-  const y0 = Math.floor(minY - M); const y1 = Math.ceil(maxY + M);
-  const il = isl(x1 - x0, y1 - y0, null, 0.5);
-  il.paint = (i) => paintGlow(i, { x0, x1, y0, y1 });
-  const z = 0.2;
-  elements.unshift({
-    name: 'glow_halo',
-    parent: 'wing',
-    from: [x0, y0, r2(z - 0.15)],
-    to: [x1, y1, r2(z + 0.1)],
-    origin: [0, 0, 0],
-    rotation: [0, 0, 0],
-    faces: { north: il, south: il },
-    z: -1,
-  });
-  placed.push({ glow: true, il, x0, x1, y0, y1, z, order: -1 });
-}
-
-function paintGlow(il, g) {
-  const { w, h } = il;
-  il.data = Buffer.alloc(w * h * 4);
-  const mask = new Uint8Array(w * h);
-  const shapes = placed.filter((p) => !p.glow && !p.gem);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const X = g.x0 + ((x + 0.5) / w) * (g.x1 - g.x0);
-      const Y = g.y1 - ((y + 0.5) / h) * (g.y1 - g.y0);
-      let inside = false;
-      for (const f of shapes) {
-        if (f.bone ? inBone(f, X, Y) : inFeather(f, X, Y)) { inside = true; break; }
-      }
-      mask[y * w + x] = inside ? 1 : 0;
+  const b = { x0: Math.max(0.5, minX - HALO.margin), x1: maxX + HALO.margin, y0: minY - HALO.margin, y1: maxY + HALO.margin };
+  // silhouette mask and distance field (0.2 unit cells)
+  const cell = 0.2;
+  const nx = Math.ceil((b.x1 - b.x0) / cell); const ny = Math.ceil((b.y1 - b.y0) / cell);
+  const shapes = placed.filter((p) => !p.glow);
+  const mask = new Uint8Array(nx * ny);
+  for (let y = 0; y < ny; y++) {
+    for (let x = 0; x < nx; x++) {
+      const X = b.x0 + (x + 0.5) * cell; const Y = b.y1 - (y + 0.5) * cell;
+      for (const f of shapes) { if (f.bone || f.gem ? inBone(f, X, Y) : inFeather(f, X, Y)) { mask[y * nx + x] = 1; break; } }
     }
   }
-  const pxU = (g.x1 - g.x0) / w; // units per texel
-  const reach = Math.ceil(3.2 / pxU);
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let d = 1e9;
-      if (mask[y * w + x]) d = 0;
-      else {
-        for (let dy = -reach; dy <= reach; dy++) {
-          for (let dx = -reach; dx <= reach; dx++) {
-            const xx = x + dx; const yy = y + dy;
-            if (xx < 0 || yy < 0 || xx >= w || yy >= h || !mask[yy * w + xx]) continue;
-            d = Math.min(d, Math.hypot(dx, dy) * pxU);
+  const rch = Math.ceil(HALO.reach / cell);
+  const dist = new Float32Array(nx * ny).fill(99);
+  for (let y = 0; y < ny; y++) {
+    for (let x = 0; x < nx; x++) {
+      if (mask[y * nx + x]) { dist[y * nx + x] = 0; continue; }
+      let d = 99;
+      for (let dy = -rch; dy <= rch; dy++) for (let dx = -rch; dx <= rch; dx++) {
+        const xx = x + dx; const yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= nx || yy >= ny || !mask[yy * nx + xx]) continue;
+        d = Math.min(d, Math.hypot(dx, dy) * cell);
+      }
+      dist[y * nx + x] = d;
+    }
+  }
+  const field = (X, Y) => {
+    const x = Math.floor((X - b.x0) / cell); const y = Math.floor((b.y1 - Y) / cell);
+    if (x < 0 || y < 0 || x >= nx || y >= ny) return { a: 0, d: 99 };
+    const d = dist[y * nx + x];
+    if (d < HALO.gap || d >= HALO.reach) return { a: 0, d };
+    // soft bump: 0 at the gap, peak close to it, 0 again at the reach; faded out towards the spine side
+    const u = (d - HALO.gap) / (HALO.reach - HALO.gap);
+    const a = HALO.peak * smooth(0, 0.3, u) * (1 - smooth(0.3, 1, u)) * smooth(0.6, 2.4, X);
+    return { a: a * 1.0, d };
+  };
+  // tiles, the ones without any halo are dropped
+  const nTx = Math.ceil((b.x1 - b.x0) / HALO.tile); const nTy = Math.ceil((b.y1 - b.y0) / HALO.tile);
+  const tw = (b.x1 - b.x0) / nTx; const th = (b.y1 - b.y0) / nTy;
+  let n = 0;
+  let minD = 99;
+  for (let j = 0; j < nTy; j++) {
+    for (let i = 0; i < nTx; i++) {
+      const t = { x0: b.x0 + i * tw, x1: b.x0 + (i + 1) * tw, y0: b.y0 + j * th, y1: b.y0 + (j + 1) * th };
+      let mxa = 0;
+      for (let yy = t.y0 + 0.1; yy < t.y1; yy += 0.25) for (let xx = t.x0 + 0.1; xx < t.x1; xx += 0.25) mxa = Math.max(mxa, field(xx, yy).a);
+      if (mxa < 0.04) continue;
+      n += 1;
+      const paint = (mirror) => (il) => {
+        il.data = Buffer.alloc(il.w * il.h * 4);
+        for (let y = 0; y < il.h; y++) {
+          for (let x = 0; x < il.w; x++) {
+            const u = (x + 0.5) / il.w;
+            const X = t.x0 + (mirror ? 1 - u : u) * (t.x1 - t.x0);
+            const Y = t.y1 - ((y + 0.5) / il.h) * (t.y1 - t.y0);
+            const { a, d } = field(X, Y);
+            if (a < 0.015) continue;
+            HALO.minD = Math.min(HALO.minD === undefined ? 99 : HALO.minD, d);
+            const col = mix(C.paleGold, C.gold, smooth(0.0, 1.0, (d - HALO.gap) / (HALO.reach - HALO.gap)));
+            const p = (y * il.w + x) * 4;
+            il.data[p] = Math.round(col[0]); il.data[p + 1] = Math.round(col[1]); il.data[p + 2] = Math.round(col[2]);
+            il.data[p + 3] = Math.round(clamp(a, 0, 1) * 255);
           }
         }
+      };
+      const ilS = isl(t.x1 - t.x0, t.y1 - t.y0, paint(false), 0.6);
+      const ilN = isl(t.x1 - t.x0, t.y1 - t.y0, paint(true), 0.6);
+      const nn = String(n).padStart(2, '0');
+      for (const [layer, zr, zf] of [['lo', HALO.lo, -1], ['hi', HALO.hi, 99]]) {
+        elements.push({
+          name: 'halo_' + layer + '_' + nn,
+          parent: 'wing',
+          from: [r2(t.x0), r2(t.y0), zr[0]],
+          to: [r2(t.x1), r2(t.y1), zr[1]],
+          origin: [0, 0, 0],
+          rotation: [0, 0, 0],
+          faces: { north: ilN, south: ilS },
+          z: zf,
+          zf,
+        });
       }
-      // inside tint stays faint (it sits behind the feathers), outside is a soft pale-gold falloff
-      let a = 0;
-      if (d === 0) a = 0.32;
-      else if (d < 1e8) a = 0.62 * Math.exp(-Math.pow(d / 1.25, 1.35)) * (1 - smooth(2.2, 3.2, d));
-      const col = mix(C.white, C.gold, smooth(0.0, 1.4, d));
-      const i = (y * w + x) * 4;
-      il.data[i] = Math.round(col[0]); il.data[i + 1] = Math.round(col[1]); il.data[i + 2] = Math.round(col[2]);
-      il.data[i + 3] = Math.round(clamp(a, 0, 1) * 255);
+      placed.push({ glow: true, il: ilS, x0: t.x0, x1: t.x1, y0: t.y0, y1: t.y1, z: 0.1, order: -1 });
     }
   }
+  b.tiles = n;
+  HALO.stats = b;
+  console.log('halo: ' + n + ' tiles x 2 layers, bounds x ' + b.x0.toFixed(1) + '..' + b.x1.toFixed(1) + ' y ' + b.y0.toFixed(1) + '..' + b.y1.toFixed(1));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -689,26 +724,22 @@ function modelJson(texBuf) {
     if (e.rotation && (e.rotation[0] || e.rotation[1] || e.rotation[2])) o.rotation = e.rotation;
     return o;
   });
-  // outliner: nested groups; feather groups back to front (by z), then bones/gems, child segs last
-  const zOfGroup = (g) => {
-    const c = elements.find((e) => e.parent === g.name);
-    return c ? c.z : 99;
-  };
+  // outliner = draw order: halo tiles first, then everything sorted by the depth of its front face (far to near
+  // for a viewer behind the player). Nested groups are sorted by the mean depth of their contents; inside one
+  // seg group the child seg and the feathers interleave by that key.
+  const cubesIn = (g) => [...elements.filter((e) => e.parent === g.name), ...groups.filter((x) => x.parent === g.name).flatMap(cubesIn)];
+  const keyOfGroup = (g) => { const c = cubesIn(g); return c.length ? c.reduce((a, e) => a + e.zf, 0) / c.length : 99; };
   const build = (g) => {
-    const gs = groups.filter((x) => x.parent === g.name);
-    const cubes = elements.filter((e) => e.parent === g.name);
-    const fg = gs.filter((x) => x.name.startsWith('f_')).sort((a, b) => zOfGroup(a) - zOfGroup(b));
-    const sg = gs.filter((x) => !x.name.startsWith('f_'));
-    const kids = [];
-    for (const f of fg) kids.push(build(f));
-    for (const c of cubes.sort((a, b) => a.z - b.z)) kids.push(uuidOf('cube:' + c.name));
-    for (const s of sg) kids.push(build(s));
-    return { uuid: gUuid(g), isOpen: false, children: kids };
+    const items = [];
+    for (const x of groups.filter((q) => q.parent === g.name)) items.push({ k: keyOfGroup(x), node: () => build(x) });
+    for (const c of elements.filter((e) => e.parent === g.name)) items.push({ k: c.zf, node: () => uuidOf('cube:' + c.name) });
+    items.sort((p, q) => p.k - q.k);
+    return { uuid: gUuid(g), isOpen: false, children: items.map((it) => it.node()) };
   };
   const wingNode = build(groups.find((g) => g.name === 'wing'));
-  const glowUuid = uuidOf('cube:glow_halo');
-  wingNode.children = wingNode.children.filter((c) => c !== glowUuid);
-  wingNode.children.unshift(glowUuid);
+  const ids = (p) => elements.filter((e) => e.name.startsWith(p)).map((e) => uuidOf('cube:' + e.name));
+  const loIds = ids('halo_lo_'); const hiIds = ids('halo_hi_');
+  wingNode.children = [...loIds, ...wingNode.children.filter((c) => !loIds.includes(c) && !hiIds.includes(c)), ...hiIds];
 
   return {
     meta: { format_version: '5.0', model_format: 'free', box_uv: false },
@@ -846,7 +877,7 @@ function composeMenu(srcFile, outFile) {
   mx.sort((a, b) => a - b);
   const gain = clamp(250 / mx[Math.floor(mx.length * 0.995)], 1, 2.4);
   console.log('menu gain ' + gain.toFixed(2));
-  const OUT = 256; const T = 6.15; const rootX = 0.12 * OUT; const rootY = 0.55 * OUT;
+  const OUT = 256; const T = 6.5; const rootX = 0.12 * OUT; const rootY = 0.55 * OUT;
   const out = new PNG({ width: OUT, height: OUT });
   const foot = sc / T; // source pixels per target pixel
   // source px of model point (X,Y)
@@ -895,6 +926,7 @@ fs.mkdirSync(path.dirname(OUT_MODEL), { recursive: true });
 fs.writeFileSync(OUT_MODEL, json);
 if (args.also) { fs.mkdirSync(path.dirname(args.also), { recursive: true }); fs.writeFileSync(args.also, json); }
 if (args.preview) renderPreview(args.preview, png);
+console.log('closest visible halo texel to any feather, bone or gem: ' + HALO.minD.toFixed(2) + ' units (gap ' + HALO.gap + ')');
 if (args.menu) composeMenu(args.menu, args.menuout || OUT_MENU);
 
 let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, minZ = 1e9, maxZ = -1e9;

@@ -1,6 +1,7 @@
 package eu.deusmp.deucore.mixin;
 
 import eu.deusmp.deucore.DeuConfig;
+import eu.deusmp.deucore.Tr;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.debug.DebugEntryVersion;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
@@ -18,6 +19,7 @@ public abstract class DebugEntryVersionMixin {
     private void deucore$name(DebugScreenDisplayer displayer, Level level, LevelChunk clientChunk, LevelChunk serverChunk, CallbackInfo ci) {
         if (!DeuConfig.get().f3Name) return;
         String name = Minecraft.getInstance().getUser().getName();
-        displayer.addPriorityLine("§a✦ DeuClient §7| §fSpieler: §e" + name);
+        // \uf8de = Namensschild-Icon in der Standardschrift (reiner Text, so zeigen es auch andere F3-Mods)
+        displayer.addPriorityLine("§f\uf8de §aDeuClient §7| §f" + Tr.t("Spieler") + ": §e" + name);
     }
 }

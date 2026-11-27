@@ -98,21 +98,15 @@ public final class GlassMods {
                     "Strg + Y",
                     "de.erik.discordglass.config.GlassConfig", "de.erik.discordglass.gui.GlassScreen", "Discord-Menü öffnen",
                     List.of(
-                            Option.toggle("hudEnabled", "Call-HUD anzeigen"),
                             Option.cycle("hudCorner", "HUD-Position", CORNERS),
                             Option.toggle("hudOnlySpeaking", "Nur sprechende Mitglieder"),
-                            Option.toggle("notifications", "Benachrichtigungen"),
-                            Option.percent("hudOpacity", "HUD-Deckkraft", 20, 100),
-                            Option.toggle("autoConnect", "Automatisch verbinden"),
-                            Option.toggle("richPresence", "Rich Presence"))),
+                            Option.toggle("notifications", "Benachrichtigungen"))),
             new GlassMod("glassscout", "Scout",
-                    "Zeigt bei /invsee sofort Kristalle, Totems, XP-Flaschen und die schwächste Rüstung des Gegners.",
+                    "Öffnest du ein fremdes Inventar (/invsee), zeigt eine Karte daneben Kristalle, Totems, XP-Flaschen, Extras und das schwächste Rüstungsteil.",
                     "/invsee",
                     "de.erik.glassscout.config.ScoutConfig", null, null,
                     List.of(
                             Option.cycle("mode", "Anzeigen bei", "Nur /invsee", "Jedem Container"),
-                            Option.toggle("showExtras", "Extras (Goldäpfel, Perlen, Obsidian …)"),
-                            Option.cycle("accent", "Akzentfarbe", "Rot", "Cyan", "Violett", "Smaragd", "Bernstein", "Weiß"),
-                            Option.percent("opacity", "Deckkraft", 20, 100)))
+                            Option.toggle("showExtras", "Extras (Goldäpfel, Perlen, Obsidian …)")))
     );
 }

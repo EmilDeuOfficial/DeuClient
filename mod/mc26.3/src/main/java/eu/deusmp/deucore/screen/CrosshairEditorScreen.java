@@ -168,7 +168,7 @@ public class CrosshairEditorScreen extends Screen {
     @Override
     public void extractBackground(GuiGraphicsExtractor g, int mouseX, int mouseY, float delta) {
         super.extractBackground(g, mouseX, mouseY, delta);
-        g.fillGradient(0, 0, this.width, this.height, 0x80050806, 0xA0050806);
+        g.fillGradient(0, 0, this.width, this.height, 0x8007080A, 0xA007080A);
     }
 
     @Override
@@ -183,13 +183,13 @@ public class CrosshairEditorScreen extends Screen {
             for (int x = 0; x < N; x++) {
                 boolean on = px[y * N + x];
                 boolean mid = x == N / 2 && y == N / 2;
-                DeuRender.roundRect(g, gx + x * c, gy + y * c, c - 1, c - 1, 1, on ? color : mid ? 0xFF1B2620 : 0xFF0F1410);
+                DeuRender.roundRect(g, gx + x * c, gy + y * c, c - 1, c - 1, 1, on ? color : mid ? 0xFF23262C : 0xFF16181D);
             }
         }
         // Vorschau in Originalgroesse
         int rx = rightX();
-        int vx = rx + RW / 2, vy = gy + 22;
-        DeuRender.roundRect(g, rx, gy, RW, 44, 5, 0xFF2A3A20);
+        int vx = rx + (RW - 1) / 2, vy = gy + 22;
+        DeuRender.roundRect(g, rx, gy, RW - 1, 45, 5, Ui.CARD);
         StringBuilder sb = new StringBuilder();
         for (boolean b : px) sb.append(b ? '1' : '0');
         String old = DeuConfig.get().crosshairPixels;

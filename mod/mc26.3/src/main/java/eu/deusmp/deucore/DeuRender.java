@@ -21,10 +21,10 @@ public final class DeuRender {
 
     public static final int GOLD = 0x2EFF7A;
     public static final int GOLD_LIGHT = 0x9FFFC0;
-    public static final int GOLD_DARK = 0x0F7A35;
+    public static final int GOLD_DARK = 0x20242C;
     public static final int VIOLET = 0x1FD35F;
-    public static final int VIOLET_MID = 0x0F7A35;
-    public static final int VIOLET_DARK = 0x0A2014;
+    public static final int VIOLET_MID = 0x20242C;
+    public static final int VIOLET_DARK = 0x15171C;
     public static final int NIGHT = 0x050706;
     public static final int TEXT = 0xEEF8F1;
     public static final int TEXT_DIM = 0xA3BFAA;
@@ -51,6 +51,10 @@ public final class DeuRender {
 
     public static int lerpRgb(int a, int b, float t) {
         t = Mth.clamp(t, 0f, 1f);
+        if (Theme.mixed(a, b)) {
+            a = Theme.c(a);
+            b = Theme.c(b);
+        }
         int r = (int) Mth.lerp(t, (a >> 16) & 0xFF, (b >> 16) & 0xFF);
         int g = (int) Mth.lerp(t, (a >> 8) & 0xFF, (b >> 8) & 0xFF);
         int bl = (int) Mth.lerp(t, a & 0xFF, b & 0xFF);
@@ -153,10 +157,16 @@ public final class DeuRender {
         });
     }
 
+    /** Emblem und Schriftzug neu laden (Themefarbe geaendert) */
+    static void reloadTextures() { texturesLoaded = false; }
+
     private static void register(Identifier id, String path) {
         try (InputStream in = DeuRender.class.getResourceAsStream(path)) {
             if (in == null) return;
-            Minecraft.getInstance().getTextureManager().register(id, new SmoothTexture(id.toString(), NativeImage.read(in)));
+            NativeImage img = NativeImage.read(in);
+            // nur Emblem und Schriftzug folgen der Themefarbe; Cape- und Fluegel-Vorschauen behalten ihre Farben
+            if (id.equals(EMBLEM) || id.equals(WORDMARK)) Theme.recolor(img);
+            Minecraft.getInstance().getTextureManager().register(id, new SmoothTexture(id.toString(), img));
         } catch (Exception e) {
             DeuCore.LOGGER.warn("Textur {} konnte nicht geladen werden", path, e);
         }
@@ -218,8 +228,42 @@ public final class DeuRender {
         g.blit(RenderPipelines.GUI_TEXTURED, tex, x + w - r, y + h - r, (float) c, (float) c, r, r, c, c, t, t, bottomColor);
     }
 
+    /** true: GUI-Koordinaten liegen nicht auf ganzen Bildschirm-Pixeln (krumme GUI- oder HUD-Groesse) */
+    private static boolean offGrid(GuiGraphicsExtractor g) {
+        var p = g.pose();
+        if (Math.abs(p.m01()) > 1e-4f || Math.abs(p.m10()) > 1e-4f) return false; // gedreht: so zeichnen
+        double gs = Minecraft.getInstance().getWindow().getGuiScale();
+        return frac(totalScale(g)) || frac(p.m20() * gs) || frac(p.m21() * gs);
+    }
+
+    private static boolean frac(double v) { return Math.abs(v - Math.rint(v)) > 0.01; }
+
+    private interface PxShape { void draw(int x, int y, int w, int h, double scale); }
+
+    /** Rechnet das Rechteck in Bildschirm-Pixel um und zeichnet dort: Ecken, Rand und Flaeche passen exakt zusammen */
+    private static void inPixels(GuiGraphicsExtractor g, int x, int y, int w, int h, PxShape shape) {
+        var p = g.pose();
+        double gs = Minecraft.getInstance().getWindow().getGuiScale(), s = totalScale(g);
+        int x0 = (int) Math.round((p.m20() + x * p.m00()) * gs), x1 = (int) Math.round((p.m20() + (x + w) * p.m00()) * gs);
+        int y0 = (int) Math.round((p.m21() + y * p.m11()) * gs), y1 = (int) Math.round((p.m21() + (y + h) * p.m11()) * gs);
+        g.pose().pushMatrix();
+        g.pose().identity();
+        g.pose().scale((float) (1.0 / gs), (float) (1.0 / gs));
+        shape.draw(x0, y0, x1 - x0, y1 - y0, s);
+        g.pose().popMatrix();
+    }
+
     public static void roundRect(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, int color) {
         if (w <= 0 || h <= 0 || (color >>> 24) == 0) return;
+        if (offGrid(g)) {
+            inPixels(g, x, y, w, h, (px, py, pw, ph, s) -> rectOnGrid(g, px, py, pw, ph, (int) Math.round(r * s), color));
+            return;
+        }
+        rectOnGrid(g, x, y, w, h, r, color);
+    }
+
+    private static void rectOnGrid(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, int color) {
+        if (w <= 0 || h <= 0) return;
         r = Math.min(r, Math.min(w, h) / 2);
         if (r <= 0) {
             g.fill(x, y, x + w, y + h, color);
@@ -233,6 +277,15 @@ public final class DeuRender {
 
     public static void roundGradient(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, int top, int bottom) {
         if (w <= 0 || h <= 0) return;
+        if (offGrid(g)) {
+            inPixels(g, x, y, w, h, (px, py, pw, ph, s) -> gradientOnGrid(g, px, py, pw, ph, (int) Math.round(r * s), top, bottom));
+            return;
+        }
+        gradientOnGrid(g, x, y, w, h, r, top, bottom);
+    }
+
+    private static void gradientOnGrid(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, int top, int bottom) {
+        if (w <= 0 || h <= 0) return;
         r = Math.min(r, Math.min(w, h) / 2);
         if (r <= 0) {
             g.fillGradient(x, y, x + w, y + h, top, bottom);
@@ -244,6 +297,14 @@ public final class DeuRender {
         g.fillGradient(x, y + r, x + w, y + h - r, t1, b0);
         g.fillGradient(x + r, y + h - r, x + w - r, y + h, b0, bottom);
         corners(g, x, y, w, h, r, t0, b1);
+    }
+
+    /** Abgerundete Flaeche mit waagerechtem Verlauf (beide Farben deckend) */
+    public static void roundGradientH(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, int left, int right) {
+        r = Math.min(r, Math.min(w, h) / 2);
+        roundRect(g, x, y, w, h, r, right);
+        roundRect(g, x, y, 2 * r + 1, h, r, left);
+        for (int i = r; i < w - r; i++) g.fill(x + i, y, x + i + 1, y + h, lerpArgb(left, right, (i - r) / (float) Math.max(1, w - 2 * r)));
     }
 
     private static final java.util.Map<Long, Identifier> PILL_IDS = new java.util.HashMap<>();
@@ -433,26 +494,37 @@ public final class DeuRender {
     /** Glatte, abgerundete 1-Pixel-Umrandung (GUI-Pixel) - Ecken genauso dick wie die geraden Kanten */
     public static void roundOutline(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, int color) {
         if (w <= 0 || h <= 0 || (color >>> 24) == 0) return;
-        r = Math.min(r, Math.min(w, h) / 2);
-        if (r <= 0) {
-            g.fill(x, y, x + w, y + 1, color);
-            g.fill(x, y + h - 1, x + w, y + h, color);
-            g.fill(x, y + 1, x + 1, y + h - 1, color);
-            g.fill(x + w - 1, y + 1, x + w, y + h - 1, color);
+        if (offGrid(g)) {
+            inPixels(g, x, y, w, h, (px, py, pw, ph, s) ->
+                    outlineOnGrid(g, px, py, pw, ph, (int) Math.round(r * s), Math.max(1, (int) Math.round(s)), color));
             return;
         }
-        g.fill(x + r, y, x + w - r, y + 1, color);
-        g.fill(x + r, y + h - 1, x + w - r, y + h, color);
-        g.fill(x, y + r, x + 1, y + h - r, color);
-        g.fill(x + w - 1, y + r, x + w, y + h - r, color);
+        outlineOnGrid(g, x, y, w, h, r, 1, color);
+    }
+
+    /** Rand mit der Dicke t (in Einheiten der aktuellen Matrix) */
+    private static void outlineOnGrid(GuiGraphicsExtractor g, int x, int y, int w, int h, int r, int t, int color) {
+        if (w <= 0 || h <= 0) return;
+        r = Math.min(r, Math.min(w, h) / 2);
+        if (r <= 0) {
+            g.fill(x, y, x + w, y + t, color);
+            g.fill(x, y + h - t, x + w, y + h, color);
+            g.fill(x, y + t, x + t, y + h - t, color);
+            g.fill(x + w - t, y + t, x + w, y + h - t, color);
+            return;
+        }
+        g.fill(x + r, y, x + w - r, y + t, color);
+        g.fill(x + r, y + h - t, x + w - r, y + h, color);
+        g.fill(x, y + r, x + t, y + h - r, color);
+        g.fill(x + w - t, y + r, x + w, y + h - r, color);
         double scale = totalScale(g);
-        int c = cornerPx(r, scale), t = 2 * c;
-        int thick = Math.max(1, Math.min(c, (int) Math.round(scale)));
+        int c = cornerPx(r, scale), size = 2 * c;
+        int thick = Math.max(1, Math.min(c, (int) Math.round(t * scale)));
         Identifier tex = ringTexture(c, thick);
-        g.blit(RenderPipelines.GUI_TEXTURED, tex, x, y, 0f, 0f, r, r, c, c, t, t, color);
-        g.blit(RenderPipelines.GUI_TEXTURED, tex, x + w - r, y, (float) c, 0f, r, r, c, c, t, t, color);
-        g.blit(RenderPipelines.GUI_TEXTURED, tex, x, y + h - r, 0f, (float) c, r, r, c, c, t, t, color);
-        g.blit(RenderPipelines.GUI_TEXTURED, tex, x + w - r, y + h - r, (float) c, (float) c, r, r, c, c, t, t, color);
+        g.blit(RenderPipelines.GUI_TEXTURED, tex, x, y, 0f, 0f, r, r, c, c, size, size, color);
+        g.blit(RenderPipelines.GUI_TEXTURED, tex, x + w - r, y, (float) c, 0f, r, r, c, c, size, size, color);
+        g.blit(RenderPipelines.GUI_TEXTURED, tex, x, y + h - r, 0f, (float) c, r, r, c, c, size, size, color);
+        g.blit(RenderPipelines.GUI_TEXTURED, tex, x + w - r, y + h - r, (float) c, (float) c, r, r, c, c, size, size, color);
     }
 
     public static int lerpArgb(int a, int b, float t) {
@@ -464,7 +536,7 @@ public final class DeuRender {
     /** Deu-Karte: dunkles Violett, goldener Rand, heller Schimmer oben */
     public static void panel(GuiGraphicsExtractor g, int x, int y, int w, int h, int alpha) {
         roundRect(g, x - 1, y - 1, w + 2, h + 2, 7, argb(GOLD, alpha / 3));
-        roundGradient(g, x, y, w, h, 6, argb(0x10261A, alpha * 235 / 255), argb(0x050A07, alpha * 235 / 255));
+        roundGradient(g, x, y, w, h, 6, argb(0x1B1E24, alpha * 235 / 255), argb(0x0C0D10, alpha * 235 / 255));
         g.fill(x + 6, y + 1, x + w - 6, y + 2, argb(0xFFFFFF, alpha / 8));
     }
 
@@ -496,8 +568,8 @@ public final class DeuRender {
     public static void menuBackground(GuiGraphicsExtractor g, int w, int h, int alpha) {
         long t = System.currentTimeMillis();
         float pulse = pulse(5200);
-        int top = lerpRgb(0x07130A, 0x0B2014, pulse);
-        int mid = lerpRgb(0x0F7A35, 0x0F7A35, 1f - pulse);
+        int top = lerpRgb(0x0A0B0E, 0x12151A, pulse);
+        int mid = lerpRgb(0x20242C, 0x20242C, 1f - pulse);
         g.fillGradient(0, 0, w, h / 2, argb(top, alpha), argb(mid, alpha));
         g.fillGradient(0, h / 2, w, h, argb(mid, alpha), argb(NIGHT, alpha));
 
@@ -510,7 +582,7 @@ public final class DeuRender {
         int shift = (int) ((t / 120) % 32);
         for (int layer = 0; layer < 2; layer++) {
             int ground = h - h / (layer == 0 ? 4 : 6);
-            int color = layer == 0 ? 0x0A2014 : 0x07130A;
+            int color = layer == 0 ? 0x15171C : 0x0A0B0E;
             int off = layer == 0 ? shift / 2 : shift;
             for (int x = -32, i = 0; x < w + 32; x += 16, i++) {
                 int bump = (int) ((Mth.sin(i * 0.55f + layer * 2f) + Mth.cos(i * 0.23f + 1f + layer)) * (10 - layer * 3));

@@ -3,10 +3,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import type { JavaInstall, SystemInfo } from '../../shared/types';
 import { api } from '../api';
 import { Toggle } from '../components/Common';
-import { NumberInput } from '../components/Controls';
+import { ColorInput, NumberInput } from '../components/Controls';
 import { Icon, type IconName } from '../components/Icons';
 import { SkinHead } from '../components/SkinHead';
 import { useApp } from '../store';
+import { THEME_PRESETS } from '../theme';
 import { shortVersion } from '../version';
 
 function Section({ icon, title, children }: { icon: IconName; title: string; children: ReactNode }) {
@@ -210,6 +211,22 @@ export function Settings() {
             </button>
           ))}
         </div>
+      </Section>
+
+      <Section icon="sparkle" title={t('set.theme')}>
+        <div className="flex flex-wrap items-center gap-2">
+          {THEME_PRESETS.map((c) => (
+            <button
+              key={c}
+              title={c}
+              onClick={() => updateSettings({ themeColor: c })}
+              className={`h-8 w-8 rounded-lg border-2 ${settings.themeColor === c ? 'border-white' : 'border-transparent'}`}
+              style={{ background: c }}
+            />
+          ))}
+          <ColorInput compact value={settings.themeColor} onChange={(c) => updateSettings({ themeColor: c })} />
+        </div>
+        <div className="text-xs text-ink-200/60">{t('set.themeHint')}</div>
       </Section>
 
       <Section icon="settings" title={t('set.general')}>

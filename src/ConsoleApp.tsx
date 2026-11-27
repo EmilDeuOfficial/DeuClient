@@ -1,11 +1,12 @@
 /** Konsolen-/Log-Fenster: zeigt die Ausgabe von Minecraft live mit Farben, Filter und Auto-Scroll. */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { GameState, Language } from '../shared/types';
+import type { GameState, Language, Settings } from '../shared/types';
 import { api, onEvent } from './api';
 import { Icon } from './components/Icons';
 import { TitleBar } from './components/TitleBar';
 import { translate, type TKey } from './i18n';
 import { translateLine } from './autotranslate';
+import { applyTheme } from './theme';
 
 function lineClass(line: string): string {
   if (line.startsWith('[DeuClient]')) return 'text-accent-300';
@@ -26,10 +27,12 @@ export default function ConsoleApp() {
   const t = (k: TKey) => translate(lang, k);
 
   useEffect(() => {
-    void api.settings.get().then((s) => setLang(s.language));
+    const apply = (s: Settings) => { setLang(s.language); applyTheme(s.themeColor); };
+    void api.settings.get().then(apply);
     void api.console.getLogs().then(setLines);
     void api.game.state().then(setGame);
     const offs = [
+      onEvent('settings:changed', apply),
       onEvent('game:log', (l) => setLines((prev) => {
         const next = prev.concat(l);
         return next.length > 5000 ? next.slice(-5000) : next;

@@ -22,6 +22,8 @@ public class HudConfig {
    public int accent = 2;
    public int opacity = 85;
    public boolean hideVanillaEffects = true;
+   /** Raster im HUD-Editor anzeigen und daran einrasten */
+   public boolean grid = true;
    public Hotkey editorKey = new Hotkey(65, false, false, false);
    public int configVersion = 0;
    public Map<String, HudConfig.W> widgets = new LinkedHashMap<>();
@@ -73,6 +75,17 @@ public class HudConfig {
          instance.configVersion = 1;
       }
 
+      if (instance.configVersion < 2) {
+         // neuer Standard der Darstellung: 10 % Transparenz (bisher 0)
+         for (HudConfig.W w : instance.widgets.values()) {
+            if (w.bgTransparency == 0) {
+               w.bgTransparency = 10;
+            }
+         }
+
+         instance.configVersion = 2;
+      }
+
       save();
    }
 
@@ -95,6 +108,10 @@ public class HudConfig {
       public int offX;
       public int offY;
       public float scale = 1.0F;
+      /** Hintergrund: 0 = aus, 1 = Kasten mit Rand, 2 = nur schwarz ohne Rand */
+      public int bgStyle = 1;
+      /** Transparenz des Hintergrunds in Prozent (0 = voll deckend) */
+      public int bgTransparency = 10;
       public Map<String, Integer> opts = new HashMap<>();
 
       public W() {
@@ -111,6 +128,8 @@ public class HudConfig {
       public HudConfig.W copy() {
          HudConfig.W w = new HudConfig.W(this.enabled, this.ax, this.ay, this.offX, this.offY);
          w.scale = this.scale;
+         w.bgStyle = this.bgStyle;
+         w.bgTransparency = this.bgTransparency;
          w.opts = new HashMap<>(this.opts);
          return w;
       }

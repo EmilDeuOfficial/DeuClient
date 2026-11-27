@@ -33,7 +33,9 @@ public class WingsLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
     public void submit(PoseStack pose, SubmitNodeCollector collector, int light, AvatarRenderState state, float yRot, float xRot) {
         String wings = ((DeuAvatarState) state).deucore$getWings();
         if (wings == null || wings.isEmpty() || state.isInvisible) return;
-        if (state.chestEquipment.is(Items.ELYTRA)) return; // mit Elytra keine zusätzlichen Flügel
+        int elytraPose = ((DeuAvatarState) state).deucore$getElytraPose();
+        // mit Elytra keine zusätzlichen Flügel - ausser sie ersetzen die Elytra
+        if (state.chestEquipment.is(Items.ELYTRA) && elytraPose < 0) return;
 
         WingModel model = WingModel.get(wings);
         if (model == null) return; // Modell fehlt oder ist defekt (wurde einmal gemeldet)
@@ -42,12 +44,19 @@ public class WingsLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
         float t = state.ageInTicks;
 
         WingModel.Anim anim = new WingModel.Anim();
-        anim.open = flying ? 55f : (state.isCrouching ? 30f : 16f);
+        anim.open = flying ? 55f : (state.isCrouching ? 16f : 6f); // in Ruhe eng am Koerper, nur im Flug weit gespreizt
         anim.time = t;
         if (DeuConfig.get().wingsAnimated) {
             anim.flapAmp = flying ? 24f : 5f;
             anim.flapPhase = t * (flying ? 0.8f : 0.1f);
             anim.swayAmp = flying ? 4f : 2.5f;
+        }
+
+        if (elytraPose >= 0 && model.hasClips(ElytraWings.CLIPS)) {
+            // Blockbench-Animationen statt der prozeduralen Bewegung
+            anim.clips = ElytraWings.CLIPS;
+            anim.weights = ElytraWings.weights(state.id, elytraPose);
+            anim.seconds = DeuConfig.get().wingsAnimated ? t / 20f : 0f;
         }
 
         // leichter Eigenglanz: Flügel bleiben auch nachts sichtbar
@@ -58,12 +67,17 @@ public class WingsLayer extends RenderLayer<AvatarRenderState, PlayerModel> {
 
         pose.pushPose();
         this.getParentModel().body.translateAndRotate(pose);
-        pose.translate(0f, 3f / 16f, 2.4f / 16f); // Schulterblätter, knapp hinter dem Rücken
+        float scale = DeuConfig.get().wingScale; // Fluegelgroesse (Einstellung im Kosmetik-Menue)
+        // Rueckseite des Koerpers bei z = 2/16, ein Brustpanzer traegt ein Pixel auf; jedes Modell wird mit seiner
+        // eigenen Ansatztiefe genau dort angelegt (Schulterblätter, 3/16 unter dem Hals)
+        float back = state.chestEquipment.isEmpty() || state.chestEquipment.is(Items.ELYTRA) ? 2f : 3f;
+        pose.translate(0f, 3f / 16f, (back - model.contactDepth() * scale) / 16f);
+        if (scale > 0.05f && Math.abs(scale - 1f) > 0.001f) pose.scale(scale, scale, scale);
         collector.submitCustomGeometry(pose, type, (p, vc) -> {
             WingModel.QuadSink sink = (x, y, z, u, v, nx, ny, nz) ->
                     vc.addVertex(x, y, z, 0xFFFFFFFF, u, v, OverlayTexture.NO_OVERLAY, glow, nx, ny, nz);
-            model.render(p.pose(), 1, anim, twoSided, sink);  // rechter Fluegel wie im Modell
-            model.render(p.pose(), -1, anim, twoSided, sink); // linker Fluegel gespiegelt
+            // beide Fluegel (rechts wie im Modell, links gespiegelt), nach Kameraabstand sortiert
+            model.renderSorted(p.pose(), anim, twoSided, sink);
         });
         pose.popPose();
     }

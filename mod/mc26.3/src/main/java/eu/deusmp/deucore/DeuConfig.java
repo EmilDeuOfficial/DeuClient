@@ -46,7 +46,7 @@ public class DeuConfig {
     public int zoomLevel = 1;
     public boolean zoomSmooth = true;
     /** Eigenes Fadenkreuz */
-    public boolean customCrosshair = false;
+    public boolean customCrosshair = true;
     public int crosshairStyle = 0;
     public int crosshairColor = 3;
     /** Eigene Form: 11x11 Zeichen aus 0/1 (Zeile fuer Zeile); leer = nichts gezeichnet */
@@ -57,6 +57,10 @@ public class DeuConfig {
     // ---- Cosmetics (für alle Deu-Spieler sichtbar, siehe DeuNetwork)
     public String cape = "";
     public String wings = "";
+    /** Beim Tragen einer Elytra: true = die gewaehlten Fluegel statt der Elytra, false = Elytra mit Cape-Textur */
+    public boolean elytraWings = false;
+    /** Im Kosmetik-Menue eingeklappte Kollektionen (Ids) */
+    public java.util.List<String> collapsedCollections = new java.util.ArrayList<>();
     public boolean showCosmetics = true;
     /** Scout (Modul) an/aus */
     public boolean scoutEnabled = true;
@@ -65,6 +69,11 @@ public class DeuConfig {
     /** Gruene Akzentfarbe der Module wurde einmalig gesetzt */
     public boolean moduleThemeApplied = false;
     public boolean wingsAnimated = true;
+    /** Fluegelgroesse (1.0 = Modellgroesse), einstellbar im Kosmetik-Menue */
+    public float wingScale = 1.0f;
+    /** Themefarbe: 0 = wie Launcher, sonst Vorgabe aus Theme.NAMES; Farbton fuer "Eigene" */
+    public int themeMode = 0;
+    public int themeHue = 142;
 
     // ---- Mod-Menü
     public List<String> favorites = new ArrayList<>();
@@ -102,6 +111,7 @@ public class DeuConfig {
         if (instance.favorites == null) instance.favorites = new ArrayList<>();
         if (instance.cape == null) instance.cape = "";
         if (instance.wings == null) instance.wings = "";
+        if (!(instance.wingScale >= 0.3f && instance.wingScale <= 2.0f)) instance.wingScale = 1.0f;
         // entfernte Designs (alte Namen aus bestehenden Configs: "divine", "divinesmp") auf "nichts" zuruecksetzen
         if (instance.cape.equals("divine") || instance.cape.equals("divinesmp")) instance.cape = "";
         if (instance.wings.equals("divine")) instance.wings = "";

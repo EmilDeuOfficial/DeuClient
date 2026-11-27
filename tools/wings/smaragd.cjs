@@ -201,14 +201,17 @@ function gemPainter(w, h, o) {
     w, h,
     shape: (u, v) => norm(u, v).r <= 1 + 1e-9,
     color: (u, v, pxl, pyl) => {
-      const { x, y, ax, ay, r, oct } = norm(u, v);
+      const { x, y, ax, ay, r: r0, oct } = norm(u, v);
+      const r = o.fill ? Math.min(r0, 1) : r0;
       // facet normal (sector) of this pixel
       let nx, ny;
-      if (r === ax && ax >= ay && ax >= oct) { nx = Math.sign(x); ny = 0; }
-      else if (r === ay && ay >= oct) { nx = 0; ny = Math.sign(y); }
+      if (r0 === ax && ax >= ay && ax >= oct) { nx = Math.sign(x); ny = 0; }
+      else if (r0 === ay && ay >= oct) { nx = 0; ny = Math.sign(y); }
       else { nx = Math.sign(x) * 0.707; ny = Math.sign(y) * 0.707; }
       const shade = nx * o.light[0] + ny * o.light[1];         // -1 dark .. +1 lit
       let t, a = o.alpha || 245;
+      // stepped corners of the plus-shaped gem body (outside the octagon): dark solid corner facets, no holes
+      if (o.fill && r0 > 1) return col(0.24 + 0.10 * shade, 252);
       const steps = o.steps || [0.88, 0.66, 0.42];
       if (r > steps[0]) { t = 0.58 + 0.16 * shade; }
       else if (r > steps[1]) { t = 0.46 + 0.17 * shade; }
@@ -267,27 +270,60 @@ function sidePainter(w, h, t0, t1, alpha) {
 }
 
 /* ------------------------------------------------------------ model builder */
-const ops = [];
+// The scene is built as a tree first. The renderer draws every group as: its own cubes, then its child groups in
+// outliner order (translucent pipeline, viewer behind the player: far to near = ascending Z). So cubes only live in
+// leaf groups, and every group's children are sorted by their mean Z before the operations are emitted.
+const root = { kids: [] };
+const byName = new Map();
 const geom2d = { blades: [], bars: [] };
 
 function addGroup(name, origin, rotation, parent) {
-  const o = { op: 'add_group', name, origin: origin.map(r3), rotation: rotation.map(r3) };
-  if (parent) o.parent = parent;
-  ops.push(o);
+  const g = { type: 'group', name, origin, rotation, kids: [] };
+  byName.set(name, g);
+  (parent ? byName.get(parent) : root).kids.push(g);
+  return g;
 }
 // faces: { south: {key, fu, fv}, ... } (island refs are resolved to UVs after packing)
 function addCube(name, from, to, parent, faces, origin, rotation) {
-  const o = { op: 'add_cube', name, from: from.map(r3), to: to.map(r3), parent, faces };
-  if (origin) o.origin = origin.map(r3);
-  if (rotation) o.rotation = rotation.map(r3);
-  ops.push(o);
+  byName.get(parent).kids.push({ type: 'cube', name, from, to, faces, origin, rotation });
 }
 
-// ---- arm skeleton (rest pose, XY plane) ----
-const S = [0, 0];
-const E = [6.5, 10.5];
-const W = [14.0, 15.0];
-const H = [20.5, 13.0];
+const meanZ = (n) => {
+  let s = 0, c = 0;
+  const walk = (k) => { if (k.type === 'cube') { s += (k.from[2] + k.to[2]) / 2; c++; } else k.kids.forEach(walk); };
+  walk(n);
+  return c ? s / c : 0;
+};
+function sortTree(n) {
+  if (n.kids.length > 1) {
+    const keyed = n.kids.map((k, i) => ({ k, i, z: meanZ(k) }));
+    keyed.sort((a, b) => a.z - b.z || a.i - b.i);
+    n.kids = keyed.map((e) => e.k);
+  }
+  n.kids.forEach((k) => { if (k.type === 'group') sortTree(k); });
+}
+function flatten(n, parentName, out) {
+  for (const k of n.kids) {
+    if (k.type === 'group') {
+      const o = { op: 'add_group', name: k.name, origin: k.origin.map(r3), rotation: k.rotation.map(r3) };
+      if (parentName) o.parent = parentName;
+      out.push(o);
+      flatten(k, k.name, out);
+    } else {
+      const o = { op: 'add_cube', name: k.name, from: k.from.map(r3), to: k.to.map(r3), parent: parentName, faces: k.faces };
+      if (k.origin) o.origin = k.origin.map(r3);
+      if (k.rotation) o.rotation = k.rotation.map(r3);
+      out.push(o);
+    }
+  }
+}
+
+// ---- arm skeleton (rest pose, XY plane). The whole root sits on the +X side: the renderer mirrors at the spine
+// (plus 1 unit offset) and yaws the wing outward, so nothing may reach below x = 0.5 ----
+const S = [2.2, 0];
+const E = [7.0, 10.5];
+const W = [14.5, 15.0];
+const H = [21.0, 13.0];
 const dist = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
 const LSE = dist(S, E), LEW = dist(E, W), LWH = dist(W, H);
 const ARM = LSE + LEW + LWH;
@@ -301,9 +337,10 @@ function armPoint(d) {
   return { p: [lerp(W[0], H[0], f), lerp(W[1], H[1], f)], seg: 'seg3' };
 }
 
-// layer depths (Z, backwards). rows are separated by 1.2, alternate blades inside a row by 0.4
-const Z = { C: 0.6, B: 1.8, A: 3.0, S: 3.2 };
-const BAR_Z0 = 1.8, BAR_Z1 = 4.6;
+// layer depths (Z, backwards). rows are separated by >= 1.2, alternate blades inside a row by 0.4
+const Z = { C: 0.6, B: 2.0, A: 3.4, S: 3.6 };
+const BAR_Z0 = 1.5, BAR_Z1 = 4.6;
+const FRONT = 5.0;      // front face of the gems
 const TILT = -5;        // blades curve slightly backwards (+Z)
 const ROOF = 14;        // V bevel angle of the two blade halves
 
@@ -330,15 +367,11 @@ function blade(name, parent, R, T, zBase, w, rowKey, idx, spine) {
     const sN = isl(`sp_${rowKey}_N`, 3, 64, barPainter(3, 64, { far: sp.top - 0.2, near: sp.base - 0.06, lit: 0, dark: 0, crest: false, rim: false, alpha: 250 }));
     const sE = isl(`sp_${rowKey}_E`, 3, 64, barPainter(3, 64, { far: sp.top, near: sp.base + 0.1, lit: 0, dark: 0, crest: false, rim: false, alpha: 250 }));
     const sW = isl(`sp_${rowKey}_W`, 3, 64, barPainter(3, 64, { far: sp.top - 0.12, near: sp.base, lit: 0, dark: 0, crest: false, rim: false, alpha: 250 }));
-    addCube(`${name}_s`, [R[0] - 0.4, R[1] - 0.86 * L, z0 - 0.25], [R[0] + 0.4, R[1] - 0.05 * L, z0 + 0.35], name,
+    addCube(`${name}_s`, [R[0] - 0.4, R[1] - 0.86 * L, z0 - 0.2], [R[0] + 0.4, R[1] - 0.05 * L, z0 + 0.3], name,
       { south: { key: sS, fv: true }, north: { key: sN, fv: true }, east: { key: sE, fv: true }, west: { key: sW, fv: true } });
   }
   geom2d.blades.push({ R, T, phi, L, w, rowKey });
 }
-
-// tip target curves: ellipse around (cx, cy), parameter angle t in degrees
-const CX = 12, CY = 5.5;
-const ell = (rx, ry, t) => [CX + rx * Math.cos(rad(t)), CY + ry * Math.sin(rad(t))];
 
 // piecewise linear control curve: [[f, value], ...]
 const pw = (c, f) => {
@@ -378,11 +411,12 @@ function buildFeathers() {
   };
   spike('f_s1', 'seg2', E, 86, 6.5, 3.2, 0);
   spike('f_s2', 'seg3', W, 66, 8.0, 3.4, 1);
-  spike('f_s3', 'seg3', H, -12, 14.5, 3.6, 2);
+  spike('f_s3', 'seg3', H, -12, 12.6, 3.6, 2);
 }
 
-// ---- arm bars ----
-function bar(name, parent, a, b, width, keyBase) {
+// ---- arm bars (own wrapper group per bar, so the draw order can be sorted) ----
+// the bar runs from a to b, the crystal keel only over the fractions kf0..kf1 (it must not poke through the gems)
+function bar(name, parent, a, b, width, keyBase, kf0, kf1) {
   const dx = b[0] - a[0], dy = b[1] - a[1];
   const len = Math.hypot(dx, dy);
   const beta = deg(Math.atan2(-dx, dy));
@@ -390,68 +424,75 @@ function bar(name, parent, a, b, width, keyBase) {
   const hw = width / 2;
   const t = keyBase;
   const dz = px(BAR_Z1 - BAR_Z0, 2);
+  addGroup(name, [a[0], a[1], 0], [0, 0, 0], parent);
   const south = isl(`${name}_S`, w, h, barPainter(w, h, { far: 0.56 + t, near: 0.26 + t, lit: 0.09, dark: -0.09, seg: 22, seed: 5 }));
   const north = isl(`${name}_N`, w, h, barPainter(w, h, { far: 0.34 + t, near: 0.12 + t, lit: 0.03, dark: -0.05, rim: false, crest: false, alpha: 255 }));
   const east = isl(`${name}_E`, dz, h, barPainter(dz, h, { far: 0.52 + t, near: 0.2 + t, lit: 0, dark: 0, crest: false, rimT: 0.6 }));
   const west = isl(`${name}_W`, dz, h, barPainter(dz, h, { far: 0.4 + t, near: 0.12 + t, lit: 0, dark: 0, crest: false, rimT: 0.55 }));
   const o = [a[0], a[1], 0];
-  addCube(name, [a[0] - hw, a[1], BAR_Z0], [a[0] + hw, a[1] + len, BAR_Z1], parent,
+  addCube(`${name}_bar`, [a[0] - hw, a[1], BAR_Z0], [a[0] + hw, a[1] + len, BAR_Z1], name,
     { south: { key: south }, north: { key: north }, east: { key: east }, west: { key: west } }, o, [0, 0, beta]);
   // bright crystal keel on top of the bar
   const kw = 0.9;
-  const kS = isl(`${name}_kS`, px(kw), h, barPainter(px(kw), h, { far: 0.95, near: 0.62, lit: 0, dark: 0, crest: false, rimT: 0.97, alpha: 255 }));
-  const kE = isl(`${name}_kE`, 2, h, barPainter(2, h, { far: 0.8, near: 0.5, lit: 0, dark: 0, crest: false, rim: false, alpha: 255 }));
-  const kW = isl(`${name}_kW`, 2, h, barPainter(2, h, { far: 0.66, near: 0.4, lit: 0, dark: 0, crest: false, rim: false, alpha: 255 }));
-  addCube(`${name}_keel`, [a[0] - kw / 2, a[1] + len * 0.1, BAR_Z1], [a[0] + kw / 2, a[1] + len * 0.92, BAR_Z1 + 0.6], parent,
+  const kh = h * (kf1 - kf0);
+  const kS = isl(`${name}_kS`, px(kw), kh, barPainter(px(kw), kh, { far: 0.95, near: 0.62, lit: 0, dark: 0, crest: false, rimT: 0.97, alpha: 255 }));
+  const kE = isl(`${name}_kE`, 2, kh, barPainter(2, kh, { far: 0.8, near: 0.5, lit: 0, dark: 0, crest: false, rim: false, alpha: 255 }));
+  const kW = isl(`${name}_kW`, 2, kh, barPainter(2, kh, { far: 0.66, near: 0.4, lit: 0, dark: 0, crest: false, rim: false, alpha: 255 }));
+  addCube(`${name}_keel`, [a[0] - kw / 2, a[1] + len * kf0, BAR_Z1], [a[0] + kw / 2, a[1] + len * kf1, BAR_Z1 + 0.6], name,
     { south: { key: kS }, east: { key: kE }, west: { key: kW } }, o, [0, 0, beta]);
   geom2d.bars.push({ a, b, width });
 }
 
 // ---- gems ----
-function diamondGem(name, parent, c, side, zc, thick, seed) {
+function diamondGem(name, parent, c, side, thick, seed) {
   const hs = side / 2;
   const wp = px(side);
+  const zc = FRONT - thick / 2;
+  addGroup(name, [c[0], c[1], 0], [0, 0, 0], parent);
   const front = isl(`${name}_F`, wp, wp, gemPainter(wp, wp, { hx: 1, hy: 1, c: 0, light: [-0.25, -1], steps: [0.84, 0.6, 0.34], seed }));
   const back = isl(`${name}_B`, wp, wp, sidePainter(wp, wp, 0.18, 0.3, 250));
   const sd = isl(`${name}_sd`, px(thick), wp, sidePainter(px(thick), wp, 0.3, 0.55, 245));
   const sd2 = isl(`${name}_sd2`, px(thick), wp, sidePainter(px(thick), wp, 0.16, 0.36, 245));
   const o = [c[0], c[1], zc];
-  addCube(name, [c[0] - hs, c[1] - hs, zc - thick / 2], [c[0] + hs, c[1] + hs, zc + thick / 2], parent,
+  addCube(`${name}_c`, [c[0] - hs, c[1] - hs, zc - thick / 2], [c[0] + hs, c[1] + hs, zc + thick / 2], name,
     { south: { key: front }, north: { key: back }, east: { key: sd2 }, west: { key: sd }, up: { key: sd }, down: { key: sd2 } }, o, [0, 0, 45]);
   // star sparkle in front (emblem star)
   const ss = side * 0.8;
   const star = isl(`${name}_star`, px(ss), px(ss), starPainter(px(ss), px(ss)));
-  addCube(`${name}_star`, [c[0] - ss / 2, c[1] - ss / 2, zc + thick / 2 + 0.3], [c[0] + ss / 2, c[1] + ss / 2, zc + thick / 2 + 0.3], parent,
+  addCube(`${name}_star`, [c[0] - ss / 2, c[1] - ss / 2, FRONT + 0.5], [c[0] + ss / 2, c[1] + ss / 2, FRONT + 0.5], name,
     { south: { key: star }, north: { key: star, fu: true } });
 }
 
+// Shoulder gem: ONE emerald-cut gem per wing, fully on the +X side (x 1.9 .. 6.9). Stepped octagon from a tall and a
+// wide box; both front faces are solid and carry their part of one step-cut raster, so there are no holes.
 function shoulderGem(parent) {
-  const c = [1.8, 1.6];
-  const hxw = 3.2, hyh = 4.6, ch = 1.6;
-  const zf = 5.2;
-  const wp = px(hxw * 2), hp = px(hyh * 2);
-  const sdA = isl('sg_sdA', px(4.0), px(hyh * 2), sidePainter(px(4.0), px(hyh * 2), 0.28, 0.5, 245));
-  const sdB = isl('sg_sdB', px(4.0), px(hyh * 2), sidePainter(px(4.0), px(hyh * 2), 0.16, 0.34, 245));
-  const sdC = isl('sg_sdC', px(hxw * 2), px(4.0), sidePainter(px(hxw * 2), px(4.0), 0.34, 0.5, 245));
-  const sdD = isl('sg_sdD', px(hxw * 2), px(4.0), sidePainter(px(hxw * 2), px(4.0), 0.14, 0.3, 245));
-  const dark = isl('sg_back', wp, hp, sidePainter(wp, hp, 0.1, 0.26, 252));
-  // stepped octagon body: tall + wide box
-  addCube('sg_tall', [c[0] - 2.2, c[1] - 4.6, 1.2], [c[0] + 2.2, c[1] + 4.6, zf], parent,
-    { east: { key: sdB }, west: { key: sdA }, up: { key: sdC }, down: { key: sdD }, north: { key: dark } });
-  addCube('sg_wide', [c[0] - 3.2, c[1] - 3.2, 1.4], [c[0] + 3.2, c[1] + 3.2, zf - 0.2], parent,
-    { east: { key: sdB }, west: { key: sdA }, up: { key: sdC }, down: { key: sdD }, north: { key: dark } });
-  // emerald-cut table plane (octagon, step cut)
-  const front = isl('sg_front', wp, hp, gemPainter(wp, hp, { hx: hxw, hy: hyh, c: ch, light: [-0.7, -0.7], steps: [0.86, 0.64, 0.40], seed: 21, alpha: 250 }));
-  addCube('sg_table', [c[0] - hxw, c[1] - hyh, zf], [c[0] + hxw, c[1] + hyh, zf], parent,
-    { south: { key: front }, north: { key: front, fu: true } });
+  const c = [4.4, 1.0];
+  const gw = 20, gh = 32;               // gem raster in texels = 5.0 x 8.0 units
+  const tallW = 14, wideH = 22;         // 3.5 wide box x 8.0 high, 5.0 wide box x 5.5 high
+  const base = gemPainter(gw, gh, { hx: 2.5, hy: 4.0, c: 1.6, light: [-0.7, -0.7], steps: [0.86, 0.64, 0.40], seed: 21, alpha: 250, fill: true });
+  const sub = (ox, oy, w, h) => ({ w, h, color: (u, v, pxl, pyl) => base.color((ox + u * w) / gw, (oy + v * h) / gh, ox + pxl, oy + pyl) });
+  addGroup('gem_s', [c[0], c[1], 0], [0, 0, 0], parent);
+  const tz0 = 1.2, tz1 = FRONT, wz0 = 1.6, wz1 = FRONT - 0.2;
+  const tallF = isl('sg_tallF', tallW, gh, sub(3, 0, tallW, gh));
+  const wideF = isl('sg_wideF', gw, wideH, sub(0, 5, gw, wideH));
+  const tallB = isl('sg_tallB', tallW, gh, sidePainter(tallW, gh, 0.1, 0.26, 252));
+  const wideB = isl('sg_wideB', gw, wideH, sidePainter(gw, wideH, 0.1, 0.26, 252));
+  const tE = isl('sg_tE', px(tz1 - tz0), gh, sidePainter(px(tz1 - tz0), gh, 0.16, 0.34, 245));
+  const tW = isl('sg_tW', px(tz1 - tz0), gh, sidePainter(px(tz1 - tz0), gh, 0.28, 0.5, 245));
+  const tU = isl('sg_tU', tallW, px(tz1 - tz0), sidePainter(tallW, px(tz1 - tz0), 0.34, 0.5, 245));
+  const tD = isl('sg_tD', tallW, px(tz1 - tz0), sidePainter(tallW, px(tz1 - tz0), 0.14, 0.3, 245));
+  const wE = isl('sg_wE', px(wz1 - wz0), wideH, sidePainter(px(wz1 - wz0), wideH, 0.16, 0.34, 245));
+  const wW = isl('sg_wW', px(wz1 - wz0), wideH, sidePainter(px(wz1 - wz0), wideH, 0.28, 0.5, 245));
+  const wU = isl('sg_wU', gw, px(wz1 - wz0), sidePainter(gw, px(wz1 - wz0), 0.34, 0.5, 245));
+  const wD = isl('sg_wD', gw, px(wz1 - wz0), sidePainter(gw, px(wz1 - wz0), 0.14, 0.3, 245));
+  addCube('sg_tall', [c[0] - 1.75, c[1] - 4.0, tz0], [c[0] + 1.75, c[1] + 4.0, tz1], 'gem_s',
+    { south: { key: tallF }, north: { key: tallB }, east: { key: tE }, west: { key: tW }, up: { key: tU }, down: { key: tD } });
+  addCube('sg_wide', [c[0] - 2.5, c[1] - 2.75, wz0], [c[0] + 2.5, c[1] + 2.75, wz1], 'gem_s',
+    { south: { key: wideF }, north: { key: wideB }, east: { key: wE }, west: { key: wW }, up: { key: wU }, down: { key: wD } });
   const ss = 4.0;
   const star = isl('sg_star', px(ss), px(ss), starPainter(px(ss), px(ss)));
-  addCube('sg_star', [c[0] - ss / 2, c[1] - ss / 2, zf + 0.6], [c[0] + ss / 2, c[1] + ss / 2, zf + 0.6], parent,
+  addCube('sg_star', [c[0] - ss / 2, c[1] - ss / 2, FRONT + 0.5], [c[0] + ss / 2, c[1] + ss / 2, FRONT + 0.5], 'gem_s',
     { south: { key: star }, north: { key: star, fu: true } });
-  const hw2 = 7.5, hh2 = 9.5;
-  const halo = isl('sg_halo', px(hw2 * 2, 3), px(hh2 * 2, 3), haloPainter(px(hw2 * 2, 3), px(hh2 * 2, 3), 120, 0.55));
-  addCube('sg_halo', [c[0] - hw2, c[1] - hh2, 0.2], [c[0] + hw2, c[1] + hh2, 0.2], parent,
-    { south: { key: halo }, north: { key: halo, fu: true } });
 }
 
 function buildModel() {
@@ -459,13 +500,62 @@ function buildModel() {
   addGroup('seg1', [S[0], S[1], 0], [0, 0, 0], 'wing');
   addGroup('seg2', [E[0], E[1], 0], [0, 0, 0], 'seg1');
   addGroup('seg3', [W[0], W[1], 0], [0, 0, 0], 'seg2');
+  const dS = [(E[0] - S[0]) / LSE, (E[1] - S[1]) / LSE];
+  const a1 = [S[0] + 4.0 * dS[0], S[1] + 4.0 * dS[1]];     // the arm starts behind the shoulder gem
   shoulderGem('wing');
-  bar('arm1', 'seg1', S, E, 3.8, 0.0);
-  bar('arm2', 'seg2', E, W, 3.2, 0.04);
-  bar('arm3', 'seg3', W, H, 2.6, 0.08);
-  diamondGem('gem_e', 'seg2', E, 3.6, 3.4, 2.2, 31);
-  diamondGem('gem_w', 'seg3', W, 3.0, 3.4, 2.0, 37);
+  bar('arm1', 'seg1', a1, E, 3.8, 0.0, 0.26, 0.62);
+  bar('arm2', 'seg2', E, W, 3.2, 0.04, 0.33, 0.73);
+  bar('arm3', 'seg3', W, H, 2.6, 0.08, 0.35, 0.92);
+  diamondGem('gem_e', 'seg2', E, 3.6, 2.4, 31);
+  diamondGem('gem_w', 'seg3', W, 3.0, 2.2, 37);
   buildFeathers();
+  sortTree(root);
+}
+
+/* ------------------------------------------------------------ geometry check */
+// World-space check of the finished tree: minimum X of every cube (all 8 corners through cube and group
+// rotations) and the same after the renderer's outward yaw (idle 16, crouch 30 degrees; the renderer
+// offsets the wing 1 unit from the spine, so x' < -1 would cross into the mirrored wing).
+function rotAbout(p, org, rot) {
+  const [rx, ry, rz] = rot.map(rad);
+  let x = p[0] - org[0], y = p[1] - org[1], z = p[2] - org[2];
+  let t = y * Math.cos(rx) - z * Math.sin(rx); z = y * Math.sin(rx) + z * Math.cos(rx); y = t;
+  t = x * Math.cos(ry) + z * Math.sin(ry); z = -x * Math.sin(ry) + z * Math.cos(ry); x = t;
+  t = x * Math.cos(rz) - y * Math.sin(rz); y = x * Math.sin(rz) + y * Math.cos(rz); x = t;
+  return [x + org[0], y + org[1], z + org[2]];
+}
+function checkGeometry() {
+  const res = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity, yaw: { 16: Infinity, 30: Infinity }, low: [] };
+  const walk = (n, chain) => {
+    for (const k of n.kids) {
+      if (k.type === 'group') { walk(k, [k, ...chain]); continue; }
+      let mnx = Infinity;
+      for (let i = 0; i < 8; i++) {
+        let p = [i & 1 ? k.to[0] : k.from[0], i & 2 ? k.to[1] : k.from[1], i & 4 ? k.to[2] : k.from[2]];
+        if (k.rotation) p = rotAbout(p, k.origin, k.rotation);
+        for (const g of chain) p = rotAbout(p, g.origin, g.rotation);
+        mnx = Math.min(mnx, p[0]);
+        res.maxX = Math.max(res.maxX, p[0]); res.minY = Math.min(res.minY, p[1]); res.maxY = Math.max(res.maxY, p[1]);
+        res.minZ = Math.min(res.minZ, p[2]); res.maxZ = Math.max(res.maxZ, p[2]);
+        for (const o of [16, 30]) res.yaw[o] = Math.min(res.yaw[o], p[0] * Math.cos(rad(o)) - p[2] * Math.sin(rad(o)));
+      }
+      res.minX = Math.min(res.minX, mnx);
+      if (mnx < 0.5) res.low.push(`${k.name}(${mnx.toFixed(2)})`);
+    }
+  };
+  walk(root, []);
+  return res;
+}
+// ascending-Z check of every level (mean Z of the subtree)
+function checkOrder() {
+  const bad = [];
+  const walk = (n) => {
+    let prev = -Infinity;
+    for (const k of n.kids) { const z = meanZ(k); if (z + 1e-9 < prev) bad.push(k.name); prev = z; }
+    n.kids.forEach((k) => { if (k.type === 'group') walk(k); });
+  };
+  walk(root);
+  return bad;
 }
 
 /* ------------------------------------------------------------------ output */
@@ -501,6 +591,8 @@ if (argv.includes('--stats')) {
   console.log(lines.join('\n'));
   console.log(`total island area ${Object.values(g).reduce((a, b) => a + b, 0)} of ${TEX * TEX}`);
 }
+const ops = [];
+flatten(root, null, ops);
 const usedRows = packIslands();
 const atlas = renderAtlas();
 fs.mkdirSync(path.dirname(TEX_OUT), { recursive: true });
@@ -559,6 +651,11 @@ if (BBMODEL_OUT) {
 }
 
 const nCube = out.filter((o) => o.op === 'add_cube').length;
+const gc = checkGeometry();
+console.log(`bounds x ${gc.minX.toFixed(2)}..${gc.maxX.toFixed(2)}, y ${gc.minY.toFixed(2)}..${gc.maxY.toFixed(2)}, z ${gc.minZ.toFixed(2)}..${gc.maxZ.toFixed(2)}`);
+console.log(`cubes below x=0.5: ${gc.low.length ? gc.low.join(' ') : 'none'}; min x after yaw 16: ${gc.yaw[16].toFixed(2)}, 30: ${gc.yaw[30].toFixed(2)} (must stay >= -1)`);
+const ob = checkOrder();
+console.log(`draw order ascending in Z at every level: ${ob.length ? 'NO ' + ob.join(',') : 'yes'}`);
 console.log(`smaragd: ${nCube} cubes, ${islands.size} islands, atlas rows used ${usedRows}/${TEX}px`);
 console.log(`texture -> ${TEX_OUT}`);
 console.log(`ops     -> ${OPS_OUT}`);
@@ -573,11 +670,6 @@ console.log(`ops     -> ${OPS_OUT}`);
 if (argv.includes('--preview-prep')) {
   const i = argv.indexOf('--preview-prep');
   const m = JSON.parse(fs.readFileSync(BBMODEL_OUT, 'utf8'));
-  const halo = m.elements.find((e) => e.name === 'sg_halo');
-  const strip = (nodes) => nodes.filter((n) => n !== halo.uuid && (typeof n === 'string' || ((n.children = strip(n.children)), true)));
-  m.outliner = strip(m.outliner);
-  m.elements = m.elements.filter((e) => e !== halo);
-  fs.writeFileSync(argv[i + 1], JSON.stringify(m));
   const { randomUUID } = require('crypto');
   // brightest fully opaque atlas texel gives the marker a texture that always renders
   const at = PNG.sync.read(fs.readFileSync(TEX_OUT));
@@ -589,6 +681,13 @@ if (argv.includes('--preview-prep')) {
   const mk = { uuid: randomUUID(), name: 'marker', origin: [0, 0, 5.5], color: 0, type: 'cube', from: [-0.8, -0.8, 5.5], to: [0.8, 0.8, 5.5], box_uv: false,
     faces: { north: { uv: [0, 0, 0, 0] }, east: { uv: [0, 0, 0, 0] }, south: { uv: [bx, by, bx + 1, by + 1], texture: 0 }, west: { uv: [0, 0, 0, 0] }, up: { uv: [0, 0, 0, 0] }, down: { uv: [0, 0, 0, 0] } },
     rescale: false, locked: false, light_emission: 0, render_order: 'default', allow_mirror_modeling: true, autouv: 0 };
+  // the plain model carries the same marker without a texture (invisible) so both renders get identical framing
+  const plain = JSON.parse(JSON.stringify(m));
+  const mkp = JSON.parse(JSON.stringify(mk));
+  mkp.faces.south = { uv: [0, 0, 0, 0] };
+  plain.elements.push(mkp);
+  plain.outliner.push(mkp.uuid);
+  fs.writeFileSync(argv[i + 1], JSON.stringify(plain));
   m.elements.push(mk);
   m.outliner.push(mk.uuid);
   fs.writeFileSync(argv[i + 2], JSON.stringify(m));
@@ -612,7 +711,7 @@ if (argv.includes('--compose')) {
   let x0 = W0, y0 = H0, x1 = 0, y1 = 0;
   for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) if (plain.data[(y * W0 + x) * 4 + 3] > 24) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
   const N = 256, rx = 0.12 * N, ry = 0.55 * N, lo = 0.05 * N, hi = 0.95 * N;
-  const sc = Math.min((hi - rx) / (x1 - ox), (rx - lo) / (ox - x0), (ry - lo) / (oy - y0), (hi - ry) / (y1 - oy));
+  const sc = Math.min((hi - rx) / (x1 - ox), ox > x0 ? (rx - lo) / (ox - x0) : Infinity, (ry - lo) / (oy - y0), (hi - ry) / (y1 - oy));
   const out = new PNG({ width: N, height: N });
   const gain = parseFloat(arg('--gain', '1.0'));
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {

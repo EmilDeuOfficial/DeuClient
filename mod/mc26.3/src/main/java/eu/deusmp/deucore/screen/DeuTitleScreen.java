@@ -18,8 +18,10 @@ import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.ServerList;
+import net.minecraft.client.multiplayer.ServerStatusPinger;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.network.EventLoopGroupHolder;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.PlayerSkin;
 
@@ -35,12 +37,16 @@ import java.util.function.Supplier;
  *  - unten rechts: Kosmetik-Karte
  */
 public class DeuTitleScreen extends Screen {
-    private static final int BW = 200;
+    private static final int BW = 170;
+    private static final int PW = 164, PH = 80; // Karte unten rechts
     private static Supplier<PlayerSkin> skinLookup;
     private String dockTip;
     private final long openedAt = System.currentTimeMillis();
     private int bh = 22, gap = 6;
     private final List<DockEntry> dock = new ArrayList<>();
+    /** Pingt die Server der Leiste: der gruene Punkt erscheint nur, wenn der Server antwortet */
+    private final ServerStatusPinger pinger = new ServerStatusPinger();
+    private List<ServerData> pinged;
 
     private record DockEntry(ServerData data, DeuRender.PixelImage icon) {}
 
@@ -67,16 +73,16 @@ public class DeuTitleScreen extends Screen {
         addRenderableWidget(new IconButton(x, y, BW, bh, Ui.I_PEOPLE, Component.translatable("menu.multiplayer"),
                 b -> this.minecraft.gui.setScreen(new JoinMultiplayerScreen(this))));
         y += bh + gap;
-        addRenderableWidget(new IconButton(x, y, BW, bh, Ui.I_WINGS, Component.literal("Kosmetik"),
-                b -> this.minecraft.gui.setScreen(new DeuModMenuScreen(this, DeuModMenuScreen.Tab.COSMETICS))));
-        y += bh + gap;
-        addRenderableWidget(new IconButton(x, y, BW, bh, Ui.I_GRID, Component.literal("Mods"),
+        addRenderableWidget(new IconButton(x, y, BW, bh, Ui.I_GRID, Component.literal("Mod-Menü"),
                 b -> this.minecraft.gui.setScreen(new DeuModMenuScreen(this))));
+        y += bh + gap;
+        addRenderableWidget(new IconButton(x, y, BW, bh, Ui.I_WINGS, Component.literal("KOSMETIK"), Style.FEATURE, 0,
+                b -> this.minecraft.gui.setScreen(new DeuModMenuScreen(this, DeuModMenuScreen.Tab.COSMETICS))));
         y += bh + gap;
         y += 12;
 
         int qy = Math.min(y, this.height - 42);
-        addRenderableWidget(new IconButton(cx - 60, qy, 120, 20, null, Component.literal("SPIEL BEENDEN"), Style.DANGER, 0, b -> this.minecraft.stop()));
+        addRenderableWidget(new IconButton(cx - 54, qy, 108, 20, Ui.I_POWER, Component.literal("SPIEL BEENDEN"), Style.DANGER, 0, b -> this.minecraft.stop()));
 
         // Schnellzugriff oben rechts (quadratisch)
         int s = 24, qx = this.width - 8 - s;
@@ -84,6 +90,8 @@ public class DeuTitleScreen extends Screen {
         qx -= s + 5;
         addRenderableWidget(new IconButton(qx, 8, s, s, Ui.I_GEAR, Component.empty(), b -> this.minecraft.gui.setScreen(new OptionsScreen(this, this.minecraft.options))));
         qx -= s + 5;
+        addRenderableWidget(new IconButton(qx, 8, s, s, Ui.I_PAINT_BRUSH, Component.empty(), b -> eu.deusmp.deucore.Features.all(p -> p).stream()
+                .filter(f -> f.id().equals("theme")).findFirst().ifPresent(f -> this.minecraft.gui.setScreen(new FeatureSettingsScreen(this, f)))));
 
         // Server-Leiste links
         loadDock();
@@ -94,7 +102,7 @@ public class DeuTitleScreen extends Screen {
         }
 
         if (showPromo()) {
-            addRenderableWidget(new IconButton(this.width - 186, this.height - 96, 176, 84, null, Component.empty(), Style.GHOST, 0,
+            addRenderableWidget(new IconButton(this.width - PW - 10, this.height - PH - 12, PW, PH, null, Component.empty(), Style.GHOST, 0,
                     b -> this.minecraft.gui.setScreen(new DeuModMenuScreen(this, DeuModMenuScreen.Tab.COSMETICS))));
         }
     }
@@ -104,11 +112,25 @@ public class DeuTitleScreen extends Screen {
     private void loadDock() {
         dock.clear();
         try {
-            ServerList list = new ServerList(this.minecraft);
-            list.load();
-            int max = Math.min(list.size(), Math.max(1, (this.height - 80) / 32));
+            if (pinged == null) {
+                ServerList list = new ServerList(this.minecraft);
+                list.load();
+                pinged = new ArrayList<>();
+                for (int i = 0; i < Math.min(list.size(), 6); i++) {
+                    ServerData sd = list.get(i);
+                    pinged.add(sd);
+                    try {
+                        sd.setState(ServerData.State.PINGING);
+                        pinger.pingServer(sd, () -> { }, () -> { },
+                                EventLoopGroupHolder.remote(this.minecraft.options.useNativeTransport()));
+                    } catch (Exception ex) {
+                        sd.setState(ServerData.State.UNREACHABLE);
+                    }
+                }
+            }
+            int max = Math.min(pinged.size(), Math.max(1, (this.height - 80) / 32));
             for (int i = 0; i < Math.min(max, 6); i++) {
-                ServerData sd = list.get(i);
+                ServerData sd = pinged.get(i);
                 DeuRender.PixelImage icon = null;
                 byte[] bytes = sd.getIconBytes();
                 if (bytes != null) {
@@ -125,6 +147,18 @@ public class DeuTitleScreen extends Screen {
         }
     }
 
+    @Override
+    public void tick() {
+        super.tick();
+        pinger.tick();
+    }
+
+    @Override
+    public void removed() {
+        pinger.removeAll();
+        super.removed();
+    }
+
     private int dockTop() {
         return this.height / 2 - dock.size() * 32 / 2;
     }
@@ -134,7 +168,7 @@ public class DeuTitleScreen extends Screen {
     }
 
     private boolean showPromo() {
-        return this.width / 2 + BW / 2 + 16 < this.width - 186 && this.height > 230;
+        return this.width / 2 + BW / 2 + 14 < this.width - PW - 10 && this.height > 220;
     }
 
     private PlayerSkin skin() {
@@ -152,11 +186,11 @@ public class DeuTitleScreen extends Screen {
         // Server-Leiste
         dockTip = null;
         int dy = dockTop();
-        if (!dock.isEmpty()) DeuRender.roundRect(g, 2, dy - 4, 36, dock.size() * 32 + 4, 5, 0xCC0A0D0B);
+        if (!dock.isEmpty()) DeuRender.roundRect(g, 2, dy - 4, 36, dock.size() * 32 + 4, 5, Ui.BG);
         for (DockEntry e : dock) {
             if (e.icon() != null) DeuRender.drawRounded(g, e.icon(), 8, dy + 2, 24, 0.2);
             else DeuRender.drawEmblem(g, 8, dy + 2, 24, 255);
-            DeuRender.roundRect(g, 28, dy, 6, 6, 3, 0xFF3DDC84);
+            DeuRender.roundRect(g, 28, dy, 6, 6, 3, e.data().state() == ServerData.State.SUCCESSFUL ? 0xFF3DDC84 : 0xFF6B7280);
             if (mouseX >= 6 && mouseX < 34 && mouseY >= dy && mouseY < dy + 28) {
                 dockTip = e.data().name + "\n" + e.data().ip;
             }
@@ -164,9 +198,9 @@ public class DeuTitleScreen extends Screen {
         }
 
         // Profil oben rechts
-        String name = this.minecraft.getUser().getName().toUpperCase();
+        String name = this.minecraft.getUser().getName();
         int chipW = Ui.boldWidth(name) + 34;
-        int chipX = this.width - 8 - 2 * 29 - 4 - chipW;
+        int chipX = this.width - 8 - 3 * 29 - chipW;
         DeuRender.roundRect(g, chipX, 8, chipW, 24, 4, Ui.FIELD);
         PlayerFaceExtractor.extractRenderState(g, skin(), chipX + 5, 12, 16);
         Ui.boldText(g, name, chipX + 26, 16, Ui.TEXT);
@@ -175,24 +209,24 @@ public class DeuTitleScreen extends Screen {
         int lw = Math.min(240, this.width - 40);
         DeuRender.drawWordmark(g, cx - lw / 2, Math.max(36, logoY() - 22), lw, alpha);
 
-        // Kosmetik-Karte unten rechts
+        // Kollektions-Karte unten rechts
         if (showPromo()) {
-            int kx = this.width - 186, ky = this.height - 96;
-            boolean hover = mouseX >= kx && mouseX < kx + 176 && mouseY >= ky && mouseY < ky + 84;
-            DeuRender.roundRect(g, kx - 1, ky - 1, 178, 86, 5, hover ? Ui.GOLD : 0x40FFFFFF);
-            DeuRender.roundGradient(g, kx, ky, 176, 84, 4, 0xF00F2B1A, 0xF0050A07);
-            Ui.wingPair(g, Cosmetics.wingsUi("smaragd"), kx + 124, ky + 10, 52);
-            Ui.boldText(g, "GALAXIE-", kx + 10, ky + 12, Ui.GOLD);
-            Ui.boldText(g, "FLÜGEL", kx + 10, ky + 23, Ui.GOLD);
-            Ui.text(g, "Capes & Flügel", kx + 10, ky + 52, Ui.TEXT_DIM);
-            Ui.text(g, "für alle sichtbar", kx + 10, ky + 63, Ui.TEXT_DIM);
+            int kx = this.width - PW - 10, ky = this.height - PH - 12;
+            boolean hover = mouseX >= kx && mouseX < kx + PW && mouseY >= ky && mouseY < ky + PH;
+            if (hover) DeuRender.roundRect(g, kx - 1, ky - 1, PW + 2, PH + 2, 6, Ui.ACCENT);
+            DeuRender.roundRect(g, kx, ky, PW, PH, 5, Ui.CARD);
+            Ui.boldText(g, Cosmetics.COLLECTION, kx + 9, ky + 8, Ui.TEXT);
+            Ui.text(g, "Capes & Flügel", kx + 9, ky + 19, Ui.TEXT_DIM);
+            int i = 0;
+            for (String id : new String[]{"gold", "nacht", "daemon"}) Ui.capeFront(g, id, kx + 9 + i++ * 23, ky + 34, 20, 32);
+            Ui.wingPair(g, Cosmetics.wingsUi("smaragd"), kx + PW - 43, ky + 34, 34);
         }
 
         super.extractRenderState(g, mouseX, mouseY, delta);
         if (dockTip != null) Ui.tooltip(g, mouseX, mouseY, dockTip, 220, this.width, this.height);
 
-        String version = "DeuClient " + SharedConstants.getCurrentVersion().name() + " · Rechts-Shift: Mod-Menü";
-        Ui.centered(g, version, cx, this.height - 14, 0x99B9BEC8);
+        String version = "DeuClient " + SharedConstants.getCurrentVersion().name();
+        Ui.centered(g, version, cx, this.height - 14, 0x80B9BEC8);
     }
 
     @Override

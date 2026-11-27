@@ -1,0 +1,19 @@
+{
+  "providers": [
+    {
+      "type": "ttf",
+      "file": "deucore:inter_medium.ttf",
+      "shift": [
+        0,
+        0.5
+      ],
+      "size": 10,
+      "oversample": 5.75,
+      "skip": ""
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

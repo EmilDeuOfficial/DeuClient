@@ -31,7 +31,25 @@ public final class Features {
     public enum Kind { TOGGLE, CYCLE, STEP }
 
     /** Eine einzelne Einstellung (Zeile im Einstellungs-Bildschirm) */
-    public record Setting(String label, Kind kind, String[] names, int min, int max, int step, String suffix, IntSupplier get, IntConsumer set) {
+    public record Setting(String label, Kind kind, String[] names, int min, int max, int step, String suffix, IntSupplier get, IntConsumer set,
+                          BooleanSupplier visible, String group) {
+        public Setting(String label, Kind kind, String[] names, int min, int max, int step, String suffix, IntSupplier get, IntConsumer set) {
+            this(label, kind, names, min, max, step, suffix, get, set, null, null);
+        }
+
+        public Setting(String label, Kind kind, String[] names, int min, int max, int step, String suffix, IntSupplier get, IntConsumer set,
+                       BooleanSupplier visible) {
+            this(label, kind, names, min, max, step, suffix, get, set, visible, null);
+        }
+
+        /** Dieselbe Einstellung in einer Unterkategorie */
+        public Setting in(String group) {
+            return new Setting(label, kind, names, min, max, step, suffix, get, set, visible, group);
+        }
+
+        /** false: Einstellung wird ausgeblendet, weil sie gerade nichts bewirkt */
+        public boolean shown() { return visible == null || visible.getAsBoolean(); }
+
         public String display() {
             int v = get.getAsInt();
             if (v < 0) return "-";
@@ -120,22 +138,31 @@ public final class Features {
             "armor", "Zeigt deine Rüstung und das Werkzeug in der Hand mit Haltbarkeit.",
             "keys", "Zeigt gedrückte Tasten und Klicks pro Sekunde.");
     private static final java.util.Map<String, String> HUD_ICON = java.util.Map.of(
-            "coords", Ui.I_GLOBE, "fps", Ui.I_HUD, "ping", Ui.I_SERVER, "speed", Ui.I_SPARKLE, "compass", Ui.I_CROSS,
-            "clock", Ui.I_HOURGLASS, "potions", Ui.I_PAINT, "armor", Ui.I_PERSON, "keys", Ui.I_GRID);
+            "coords", "mod_location", "fps", "mod_fps", "ping", "mod_ping", "speed", "mod_speed", "compass", "mod_compass",
+            "clock", "mod_time", "potions", "mod_color-palette", "armor", "mod_armor", "keys", "mod_keyboard");
 
     /** Baut die Liste aller Funktionen (Glass-Mods nur, wenn installiert) */
     public static List<Feature> all(Function<Screen, Screen> cosmeticsScreen) {
         List<Feature> list = new ArrayList<>();
         // ---- Client
         list.add(new Feature("f3name", "F3-Name", "Zeigt \"DeuClient\" und deinen Spielernamen oben im F3-Bildschirm.",
-                Category.CLIENT, Ui.I_INFO, true, bool("f3Name"), setBool("f3Name", false), List.of(), null));
+                Category.CLIENT, "mod_info", true, bool("f3Name"), setBool("f3Name", false), List.of(), null));
         list.add(new Feature("ownname", "Eigener Name", "Zeigt in der Ansicht von hinten/vorne (F5) deinen Namen über deinem Kopf - so wie andere Spieler ihn sehen.",
-                Category.CLIENT, Ui.I_TAG, true, bool("ownNametag"), setBool("ownNametag", false), List.of(), null));
+                Category.CLIENT, "mod_tag", true, bool("ownNametag"), setBool("ownNametag", false), List.of(), null));
+        Setting themeColor = cycle("Farbe", "themeMode", Theme.NAMES);
+        list.add(new Feature("theme", "Themefarbe", "Färbt Menüs, HUD und Logo des DeuClients in deiner Farbe.",
+                Category.CLIENT, "mod_color-palette", true, null, null, List.of(
+                new Setting("Farbe", Kind.CYCLE, Theme.NAMES, 0, Theme.CUSTOM, 1, "", themeColor.get(),
+                        v -> { themeColor.set().accept(v); Theme.refresh(); }),
+                new Setting("Farbton", Kind.STEP, null, 0, 355, 5, "°",
+                        () -> DeuConfig.get().themeHue,
+                        v -> { DeuConfig.get().themeHue = v; DeuConfig.save(); Theme.refresh(); },
+                        () -> DeuConfig.get().themeMode == Theme.CUSTOM)), null));
         list.add(new Feature("logonames", "Namensicon", "Zeigt das DeuClient-Icon neben den Namen aller Spieler, die den DeuClient nutzen - über dem Kopf und in der Tab-Liste.",
-                Category.CLIENT, Ui.I_SPARKLE, false, bool("logoNames"), setBool("logoNames", false), List.of(), null));
+                Category.CLIENT, "mod_emblem", false, bool("logoNames"), setBool("logoNames", false), List.of(), null));
         Field zoomKey = field("zoomKey");
-        list.add(new Feature("zoom", "Zoom", "Taste gedrückt halten zum Heranzoomen - wie ein Fernglas.",
-                Category.CLIENT, Ui.I_ZOOM, true, bool("zoom"), setBool("zoom", false), List.of(
+        list.add(new Feature("zoom", "Zoom", "Taste gedrückt halten zum Heranzoomen, das Mausrad zoomt weiter.",
+                Category.CLIENT, "mod_zoom", true, bool("zoom"), setBool("zoom", false), List.of(
                 cycle("Zoom-Stufe", "zoomLevel", Zoom.LEVEL_NAMES),
                 toggle("Weicher Zoom", "zoomSmooth"),
                 new Setting("Taste", Kind.CYCLE, ZOOM_KEY_NAMES, 0, ZOOM_KEYS.length - 1, 1, "",
@@ -143,7 +170,7 @@ public final class Features {
                         v -> { try { zoomKey.setInt(DeuConfig.get(), ZOOM_KEYS[Math.floorMod(v, ZOOM_KEYS.length)]); } catch (IllegalAccessException ignored) {} DeuConfig.save(); })),
                 null));
         list.add(new Feature("crosshair", "Fadenkreuz", "Eigenes Fadenkreuz in DeuClient-Farben und verschiedenen Formen.",
-                Category.CLIENT, Ui.I_CROSS, true, bool("customCrosshair"), setBool("customCrosshair", false), List.of(
+                Category.CLIENT, "mod_crosshair", true, bool("customCrosshair"), setBool("customCrosshair", false), List.of(
                 cycle("Form", "crosshairStyle", Crosshair.STYLES),
                 cycle("Farbe", "crosshairColor", Crosshair.COLOR_NAMES)), p -> new eu.deusmp.deucore.screen.CrosshairEditorScreen(p)));
 
@@ -151,16 +178,13 @@ public final class Features {
         // ---- HUD-Anzeigen: jede Anzeige ist ein eigenes Modul mit Schalter
         for (de.erik.glasshud.hud.widgets.Widget w : de.erik.glasshud.hud.widgets.Widgets.ALL) {
             final String wid = w.id;
-            List<Setting> st = new ArrayList<>();
-            st.add(new Setting("Größe", Kind.STEP, null, 50, 300, 10, " %",
-                    () -> Math.round(de.erik.glasshud.config.HudConfig.get().w(wid).scale * 100),
-                    v -> { de.erik.glasshud.config.HudConfig.get().w(wid).scale = v / 100f; de.erik.glasshud.config.HudConfig.save(); }));
+            List<Setting> st = new ArrayList<>(HudStyle.settings(wid));
             for (de.erik.glasshud.hud.widgets.Widget.Option o : w.options) {
                 final String key = o.key();
                 final int def = o.def();
                 st.add(new Setting(o.label(), Kind.CYCLE, o.values(), 0, o.values().length - 1, 1, "",
                         () -> de.erik.glasshud.config.HudConfig.get().w(wid).opts.getOrDefault(key, def),
-                        v -> { de.erik.glasshud.config.HudConfig.get().w(wid).opts.put(key, v); de.erik.glasshud.config.HudConfig.save(); }));
+                        v -> { de.erik.glasshud.config.HudConfig.get().w(wid).opts.put(key, v); de.erik.glasshud.config.HudConfig.save(); }).in("Inhalt"));
             }
             list.add(new Feature("hud_" + wid, w.name, HUD_DESC.getOrDefault(wid, ""), Category.GLASS,
                     HUD_ICON.getOrDefault(wid, Ui.I_HUD), false,
@@ -172,25 +196,38 @@ public final class Features {
         // ---- Glass-Mods
         for (GlassMod m : GlassMods.ALL) {
             if (!m.installed() || m.modId().equals("glasshud")) continue; // HUD: jede Anzeige hat ihre eigene Karte
-            List<Setting> settings = new ArrayList<>();
+            boolean scout = m.modId().equals("glassscout");
+            boolean discord = m.modId().equals("discordglass");
+            // Scout und Discord: dieselbe "Darstellung" wie die HUD-Elemente, alles Weitere unter "Inhalt"
+            List<Setting> settings = new ArrayList<>(HudStyle.settings(scout ? HudStyle.SCOUT : HudStyle.DISCORD));
             GlassMods.Option master = null;
             for (GlassMods.Option o : m.options()) {
                 if (o.field().equals("hudEnabled")) master = o;
                 Kind k = switch (o.kind()) { case TOGGLE -> Kind.TOGGLE; case CYCLE -> Kind.CYCLE; case PERCENT -> Kind.STEP; };
                 settings.add(new Setting(o.label(), k, o.names(), o.min(), o.max(), o.step(), k == Kind.STEP ? " %" : "",
-                        () -> m.get(o), v -> m.set(o, v)));
+                        () -> m.get(o), v -> m.set(o, v)).in("Inhalt"));
             }
             final GlassMods.Option mo = master;
             final String flag = m.modId().equals("glassscout") ? "scoutEnabled" : m.modId().equals("discordglass") ? "discordEnabled" : null;
             String icon = switch (m.modId()) {
                 case "glasshud" -> Ui.I_HUD;
                 case "discordglass" -> Ui.I_CHAT;
-                default -> Ui.I_EYE;
+                default -> "mod_eye";
             };
-            list.add(new Feature(m.modId(), m.name(), m.description() + " Taste: " + m.hotkey(), Category.GLASS, icon, false,
-                    flag != null ? bool(flag) : mo == null ? null : () -> m.get(mo) == 1,
-                    flag != null ? setBool(flag, false) : mo == null ? null : v -> m.set(mo, v ? 1 : 0),
-                    settings, m.screenClass() == null ? null : m::createScreen));
+            BooleanSupplier isOn = flag != null ? bool(flag) : mo == null ? null : () -> m.get(mo) == 1;
+            Consumer<Boolean> setOn = flag != null ? setBool(flag, false) : mo == null ? null : v -> m.set(mo, v ? 1 : 0);
+            if (discord) { // der Kartenschalter gilt auch fuer das per Taste ausblendbare Call-HUD
+                isOn = () -> DeuConfig.get().discordEnabled && de.erik.discordglass.config.GlassConfig.get().hudEnabled;
+                setOn = v -> {
+                    setBool("discordEnabled", false).accept(v);
+                    de.erik.discordglass.config.GlassConfig.get().hudEnabled = v;
+                    de.erik.discordglass.config.GlassConfig.save();
+                };
+            }
+            // der Scout hat keine Taste, sein Befehl steht in der Beschreibung
+            String description = scout ? m.description() : m.description() + " Taste: " + m.hotkey();
+            list.add(new Feature(m.modId(), m.name(), description, Category.GLASS, icon, false,
+                    isOn, setOn, settings, m.screenClass() == null ? null : m::createScreen));
         }
         return list;
     }

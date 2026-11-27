@@ -24,17 +24,24 @@ public final class PingWidget extends Widget {
       GuiGraphicsExtractor g = c.g;
       Glass.card(g, 0, 0, w, h, 7, c.op);
       int ping = c.d.ping;
-      int col = quality(ping, 60.0F, 130.0F, false);
+      bars(g, 6, 4, Glass.WICON, ping);
+      c.text("Ping", 22, 6, -5855048);
+      String v = ping + " ms";
+      c.textR(v, w - 8, 6, color(ping));
+   }
+
+   private static int color(int ping) {
+      return quality(ping, 60.0F, 130.0F, false);
+   }
+
+   /** Das Ping-Zeichen, auch im Discord-Overlay benutzt */
+   public static void bars(GuiGraphicsExtractor g, int x, int y, int size, int ping) {
       int active = ping < 50 ? 4 : (ping < 100 ? 3 : (ping < 180 ? 2 : 1));
 
       // Balken von links (kurz) nach rechts (lang): hud_ping4 ist der kuerzeste, hud_ping1 der laengste
       for (int i = 0; i < 4; i++) {
-         int c2 = i < active ? col : Glass.withAlpha(16777215, 40);
-         Glass.svgIcon(g, "hud_ping" + (4 - i), 6, 4, Glass.WICON, c2);
+         int c = i < active ? color(ping) : Glass.withAlpha(16777215, 40);
+         Glass.svgIcon(g, "hud_ping" + (4 - i), x, y, size, c);
       }
-
-      c.text("Ping", 22, 6, -5855048);
-      String v = ping + " ms";
-      c.textR(v, w - 8, 6, col);
    }
 }

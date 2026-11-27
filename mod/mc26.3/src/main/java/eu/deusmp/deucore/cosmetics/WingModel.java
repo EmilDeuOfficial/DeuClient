@@ -37,6 +37,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Animation (nach Gruppennamen): "wing" = Oeffnungswinkel (Yaw) + Flap (Roll), "segN" (N >= 2) = phasenverzoegerter
  * Zusatz-Roll, "f_*" = leichtes Wiegen. Alles andere folgt nur seiner Elterngruppe.
  *
+ * Alternativ spielt {@link Anim#clips} die Animationen aus der Blockbench-Datei ab (Fluegel statt Elytra).
+ *
  * Nicht von Minecraft-Klassen abhaengig (nur Gson, JOML, SLF4J), damit es ausserhalb des Spiels testbar ist.
  * Rendern nur vom Render-Thread.
  */
@@ -48,6 +50,7 @@ public final class WingModel {
     private static final float EPS = 1e-3f;
     private static final int MAX_DEPTH = 32;
     private static final int CUBE_BUDGET = 150;
+    private static final float DEFAULT_CONTACT = 0.6f;
 
     private static final int K_OTHER = 0, K_WING = 1, K_SEG = 2, K_FEATHER = 3;
 
@@ -92,9 +95,51 @@ public final class WingModel {
         public float swayAmp;
         /** Zeit in Ticks (fuer das Wiegen) */
         public float time;
+        /** Namen von Blockbench-Animationen; gesetzt = sie ersetzen die prozedurale Bewegung */
+        public String[] clips;
+        /** Gewicht je Eintrag in {@link #clips} (zusammen 1) */
+        public float[] weights;
+        /** Abspielzeit der Animationen in Sekunden */
+        public float seconds;
+    }
+
+    /** Keyframes eines Kanals einer Gruppe: Zeiten in Sekunden, je Keyframe drei Werte (Grad bzw. Faktor) */
+    private record Track(float[] times, float[] values) {}
+
+    private record Clip(float length, Map<String, Track> rotations, Map<String, Track> scales) {
+        /**
+         * Addiert den gewichteten Wert (Catmull-Rom wie in Blockbench) der Gruppe auf out.
+         * base = Ruhewert, der abgezogen wird (0 bei Drehungen, 1 bei Skalierungen).
+         */
+        void add(Map<String, Track> tracks, String group, float seconds, float weight, float base, float[] out) {
+            Track t = tracks.get(group);
+            if (t == null) return;
+            float[] times = t.times(), v = t.values();
+            int n = times.length;
+            float u = length > 0f ? seconds % length : 0f;
+            int i = 0;
+            while (i < n - 2 && times[i + 1] <= u) i++;
+            if (n == 1) {
+                for (int a = 0; a < 3; a++) out[a] += weight * (v[a] - base);
+                return;
+            }
+            float span = times[i + 1] - times[i];
+            float f = span > 0f ? Math.max(0f, Math.min(1f, (u - times[i]) / span)) : 0f;
+            // Endlosschleife: der letzte Keyframe entspricht dem ersten
+            int before = i > 0 ? i - 1 : Math.max(0, n - 2), after = i + 2 < n ? i + 2 : Math.min(1, n - 1);
+            float f2 = f * f, f3 = f2 * f;
+            for (int a = 0; a < 3; a++) {
+                float p0 = v[before * 3 + a], p1 = v[i * 3 + a], p2 = v[(i + 1) * 3 + a], p3 = v[after * 3 + a];
+                float value = 0.5f * (2f * p1 + (p2 - p0) * f + (2f * p0 - 5f * p1 + 4f * p2 - p3) * f2
+                        + (3f * p1 - p0 - 3f * p2 + p3) * f3);
+                out[a] += weight * (value - base);
+            }
+        }
     }
 
     private static final class Node {
+        /** Kennung der Gruppe in Blockbench (Animationen verweisen darauf) */
+        String uuid = "";
         final String name;
         final int kind;
         final int seg;
@@ -126,6 +171,48 @@ public final class WingModel {
         Matrix4f[] m = new Matrix4f[0];
         final Vector3f p = new Vector3f();
         final Vector3f n = new Vector3f();
+        final float[] pose = new float[3];
+        final float[] grow = new float[3];
+
+        /** Gesammelte Vertices fuer das Tiefensortieren: je (x, y, z, u, v, nx, ny, nz) */
+        float[] buf = new float[8 * 4 * 512];
+        int vertCount;
+        long[] keys = new long[512];
+        final QuadSink collector = (x, y, z, u, v, nx, ny, nz) -> {
+            if ((vertCount + 1) * 8 > buf.length) buf = Arrays.copyOf(buf, buf.length * 2);
+            int o = vertCount++ * 8;
+            buf[o] = x;
+            buf[o + 1] = y;
+            buf[o + 2] = z;
+            buf[o + 3] = u;
+            buf[o + 4] = v;
+            buf[o + 5] = nx;
+            buf[o + 6] = ny;
+            buf[o + 7] = nz;
+        };
+
+        /** Gibt alle gesammelten Quads von hinten nach vorn (Abstand zur Kamera im Ursprung) aus */
+        void flush(QuadSink sink) {
+            int nq = vertCount / 4;
+            if (keys.length < nq) keys = new long[Math.max(nq, keys.length * 2)];
+            for (int q = 0; q < nq; q++) {
+                int o = q * 32;
+                float cx = (buf[o] + buf[o + 8] + buf[o + 16] + buf[o + 24]) * 0.25f;
+                float cy = (buf[o + 1] + buf[o + 9] + buf[o + 17] + buf[o + 25]) * 0.25f;
+                float cz = (buf[o + 2] + buf[o + 10] + buf[o + 18] + buf[o + 26]) * 0.25f;
+                float d2 = cx * cx + cy * cy + cz * cz; // positiv: Bitmuster ist monoton
+                keys[q] = ((long) Float.floatToIntBits(d2) << 32) | q;
+            }
+            Arrays.sort(keys, 0, nq);
+            for (int i = nq - 1; i >= 0; i--) { // weit entfernt zuerst
+                int o = (int) (keys[i] & 0xFFFFFFFFL) * 32;
+                for (int k = 0; k < 4; k++) {
+                    int b = o + k * 8;
+                    sink.vertex(buf[b], buf[b + 1], buf[b + 2], buf[b + 3], buf[b + 4], buf[b + 5], buf[b + 6], buf[b + 7]);
+                }
+            }
+            vertCount = 0;
+        }
 
         void ensure(int size) {
             if (m.length >= size) return;
@@ -144,8 +231,12 @@ public final class WingModel {
     private final int stackSize;
     private final int quadCount;
     private final int cubeCount;
+    private final Map<String, Clip> clips;
+    private final float contact;
 
-    private WingModel(String id, Node root, int maxDepth, int quadCount, int cubeCount) {
+    private WingModel(String id, Node root, int maxDepth, int quadCount, int cubeCount, Map<String, Clip> clips) {
+        this.clips = clips;
+        this.contact = contact(root);
         this.id = id;
         this.root = root;
         this.stackSize = maxDepth + 2;
@@ -156,6 +247,37 @@ public final class WingModel {
     public String id() { return id; }
     public int quadCount() { return quadCount; }
     public int cubeCount() { return cubeCount; }
+
+    /**
+     * Tiefe (Blockbench-Z), mit der der Fluegel am Ruecken anliegt - bei jedem Modell anders. Gemessen an den Ecken
+     * hinter dem Rumpf: das vorderste Viertel (Ansatz, Edelsteine) sinkt in den Ruecken ein, der Rest liegt darauf.
+     */
+    public float contactDepth() { return contact; }
+
+    private static float contact(Node root) {
+        List<Float> depths = new ArrayList<>();
+        collectDepths(root, depths);
+        if (depths.isEmpty()) return DEFAULT_CONTACT;
+        depths.sort(Float::compare);
+        return depths.get((depths.size() - 1) / 4);
+    }
+
+    private static void collectDepths(Node n, List<Float> out) {
+        float[] q = n.quads;
+        for (int i = 0; i < n.quadCount; i++) {
+            for (int k = 0; k < 4; k++) {
+                int o = i * QUAD_FLOATS + k * 5;
+                if (q[o] >= -1.5f && q[o] <= 4.5f && q[o + 1] >= -12f && q[o + 1] <= 6f) out.add(q[o + 2]);
+            }
+        }
+        for (Node c : n.children) collectDepths(c, out);
+    }
+
+    /** true, wenn das Modell alle diese Blockbench-Animationen enthaelt */
+    public boolean hasClips(String[] names) {
+        for (String n : names) if (!clips.containsKey(n)) return false;
+        return true;
+    }
 
     /** Liefert das Modell zur Fluegel-ID oder null (fehlt/defekt: es wird nichts gezeichnet, eine Warnung pro ID) */
     public static WingModel get(String id) {
@@ -243,7 +365,52 @@ public final class WingModel {
             if (quads == 0) throw new IllegalStateException("keine renderbaren Flaechen (Cubes mit Textur und UV)");
             if (!wingFound) warn("Gruppe 'wing' fehlt - alle Gruppen der obersten Ebene werden wie 'wing' animiert");
             if (cubes > CUBE_BUDGET) warn("mehr als " + CUBE_BUDGET + " Cubes (" + cubes + ")");
-            return new WingModel(id, top, maxDepth, quads, cubes);
+            return new WingModel(id, top, maxDepth, quads, cubes, animations());
+        }
+
+        /** Liest die Dreh- und Groessen-Keyframes aller Animationen */
+        Map<String, Clip> animations() {
+            Map<String, Clip> out = new HashMap<>();
+            JsonArray list = arr(json, "animations");
+            if (list == null) return out;
+            for (JsonElement a : list) {
+                if (!a.isJsonObject()) continue;
+                JsonObject anim = a.getAsJsonObject();
+                String name = str(anim, "name");
+                JsonObject animators = obj(anim, "animators");
+                if (name == null || animators == null) continue;
+                Map<String, Track> rotations = new HashMap<>(), scales = new HashMap<>();
+                for (Map.Entry<String, JsonElement> e : animators.entrySet()) {
+                    if (!e.getValue().isJsonObject()) continue;
+                    JsonArray frames = arr(e.getValue().getAsJsonObject(), "keyframes");
+                    if (frames == null) continue;
+                    Track r = track(frames, "rotation", 0f), s = track(frames, "scale", 1f);
+                    if (r != null) rotations.put(e.getKey(), r);
+                    if (s != null) scales.put(e.getKey(), s);
+                }
+                out.put(name, new Clip(num(anim, "length", 1f), rotations, scales));
+            }
+            return out;
+        }
+
+        /** Keyframes eines Kanals, nach Zeit sortiert; null = keine. Molang-Ausdruecke zaehlen als Ruhewert. */
+        static Track track(JsonArray frames, String channel, float rest) {
+            List<float[]> keys = new ArrayList<>(); // Zeit, x, y, z
+            for (JsonElement k : frames) {
+                if (!k.isJsonObject() || !channel.equals(str(k.getAsJsonObject(), "channel"))) continue;
+                JsonArray points = arr(k.getAsJsonObject(), "data_points");
+                if (points == null || points.isEmpty() || !points.get(0).isJsonObject()) continue;
+                JsonObject p = points.get(0).getAsJsonObject();
+                keys.add(new float[]{num(k.getAsJsonObject(), "time", 0f), num(p, "x", rest), num(p, "y", rest), num(p, "z", rest)});
+            }
+            if (keys.isEmpty()) return null;
+            keys.sort((x, y) -> Float.compare(x[0], y[0]));
+            float[] times = new float[keys.size()], values = new float[keys.size() * 3];
+            for (int i = 0; i < keys.size(); i++) {
+                times[i] = keys.get(i)[0];
+                System.arraycopy(keys.get(i), 1, values, i * 3, 3);
+            }
+            return new Track(times, values);
         }
 
         void warn(String msg) {
@@ -298,6 +465,7 @@ public final class WingModel {
                 phase = (feathers++) * 0.83f;
             }
             Node node = new Node(name, kind, seg, phase, origin, rotation);
+            if (uuid != null) node.uuid = uuid;
             maxDepth = Math.max(maxDepth, depth);
             JsonArray kids = arr(entry, "children");
             if (kids != null) addChildren(node, kids, depth, false);
@@ -486,15 +654,43 @@ public final class WingModel {
         draw(root, 0, s, anim, side > 0, twoSided, sink);
     }
 
+    /**
+     * Zeichnet beide Fluegel (rechts wie im Modell, links gespiegelt) und sortiert alle Flaechen nach dem Abstand zur
+     * Kamera (Ursprung des Raums von base), weit entfernte zuerst. Die Fluegel sind transluzent und schreiben Tiefe: ohne
+     * Sortierung verdecken vordere, fast durchsichtige Flaechen die dahinter, je nach Blickrichtung (vorne/hinten).
+     */
+    public void renderSorted(Matrix4f base, Anim anim, boolean twoSided, QuadSink sink) {
+        Scratch s = SCRATCH.get();
+        s.vertCount = 0;
+        render(base, 1, anim, twoSided, s.collector);
+        render(base, -1, anim, twoSided, s.collector);
+        s.flush(sink);
+    }
+
     private void draw(Node n, int depth, Scratch s, Anim a, boolean reverse, boolean twoSided, QuadSink sink) {
         int d = depth;
         Matrix4f m = s.m[depth];
-        if (n.kind != K_OTHER || n.rest) {
+        boolean posed = a.clips != null && a.weights != null;
+        float[] pose = s.pose;
+        pose[0] = pose[1] = pose[2] = 0f;
+        float[] grow = s.grow; // Abweichung der Skalierung von 1
+        grow[0] = grow[1] = grow[2] = 0f;
+        if (posed) {
+            for (int i = 0; i < a.clips.length; i++) {
+                Clip clip = a.weights[i] > 0.001f ? clips.get(a.clips[i]) : null;
+                if (clip == null) continue;
+                clip.add(clip.rotations(), n.uuid, a.seconds, a.weights[i], 0f, pose);
+                clip.add(clip.scales(), n.uuid, a.seconds, a.weights[i], 1f, grow);
+            }
+        }
+        boolean scaled = grow[0] != 0f || grow[1] != 0f || grow[2] != 0f;
+        boolean moved = scaled || pose[0] != 0f || pose[1] != 0f || pose[2] != 0f;
+        if (n.kind != K_OTHER || n.rest || moved) {
             d = depth + 1;
             m = s.m[d];
             m.set(s.m[depth]).translate(n.ox, n.oy, n.oz);
             // Animation sitzt im Raum der Elterngruppe, die Ruhe-Rotation des Modells wird zuerst auf die Vertices angewandt
-            switch (n.kind) {
+            switch (posed ? K_OTHER : n.kind) {
                 case K_WING -> {
                     m.rotateY(-a.open * DEG);
                     float roll = a.flapAmp * (float) Math.sin(a.flapPhase);
@@ -516,7 +712,10 @@ public final class WingModel {
                 }
                 default -> { }
             }
-            if (n.rest) m.rotateZ(n.rz).rotateY(n.ry).rotateX(n.rx);
+            // wie in Blockbench: die Animation wird zur Ruhe-Drehung addiert
+            if (moved) m.rotateZ(n.rz + pose[2] * DEG).rotateY(n.ry + pose[1] * DEG).rotateX(n.rx + pose[0] * DEG);
+            else if (n.rest) m.rotateZ(n.rz).rotateY(n.ry).rotateX(n.rx);
+            if (scaled) m.scale(1f + grow[0], 1f + grow[1], 1f + grow[2]);
             m.translate(-n.ox, -n.oy, -n.oz);
         }
 

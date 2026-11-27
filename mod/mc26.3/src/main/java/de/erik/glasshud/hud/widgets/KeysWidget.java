@@ -96,9 +96,7 @@ public final class KeysWidget extends Widget {
       GuiGraphicsExtractor g = c.g;
       Glass.inset(g, x, y, kw, kh, 4, c.op);
       if (v > 0.01F) {
-         Glass.glow(g, x, y, kw, kh, 4, Glass.accent(), 3, v);
-         Glass.roundGradient(g, x, y, kw, kh, 4, Glass.alpha(Glass.accent(), v), Glass.alpha(Glass.accentDim(), v));
-         Glass.roundOutline(g, x, y, kw, kh, 4, Glass.alpha(-1325400065, v));
+         Glass.roundRect(g, x, y, kw, kh, 4, Glass.alpha(Glass.accent(), v));
       }
 
       if (!label.isEmpty()) {

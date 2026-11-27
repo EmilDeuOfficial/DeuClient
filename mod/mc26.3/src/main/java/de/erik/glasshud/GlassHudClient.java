@@ -2,7 +2,6 @@ package de.erik.glasshud;
 
 import de.erik.glasshud.config.Hotkey;
 import de.erik.glasshud.config.HudConfig;
-import de.erik.glasshud.gui.EditorScreen;
 import de.erik.glasshud.hud.HudRenderer;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
@@ -47,7 +46,7 @@ public class GlassHudClient implements ClientModInitializer {
       Screen screen = mc.gui.screen();
       boolean allowed = screen == null || screen instanceof TitleScreen || screen instanceof PauseScreen;
       if (down && !this.wasDown && allowed) {
-         mc.gui.setScreen(new EditorScreen(screen));
+         mc.gui.setScreen(new eu.deusmp.deucore.screen.HudMoveScreen(screen));
       }
 
       this.wasDown = down;

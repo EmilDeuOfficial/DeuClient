@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Zeichnet den Hintergrund aller Standard-Buttons im Deu-Stil
- * (abgerundet, violetter Verlauf, goldener Rand beim Überfahren; GoldButton in Gold).
+ * (abgerundet, flach und neutral, beim Überfahren heller; GoldButton in Akzentfarbe).
  * Die Beschriftung zeichnet Minecraft danach wie gewohnt.
  */
 @Mixin(AbstractButton.class)
@@ -42,12 +42,11 @@ public abstract class AbstractButtonMixin extends AbstractWidget.WithInactiveMes
 
         int r = Math.min(4, h / 4);
         if (gold) {
-            DeuRender.roundGradient(g, x, y, w, h, r, DeuRender.argb(hover ? 0x6BFF9E : 0x2EFF7A, a), DeuRender.argb(hover ? 0x1FD35F : 0x17A84A, a));
+            DeuRender.roundRect(g, x, y, w, h, r, DeuRender.argb(hover ? 0x3CEB7E : 0x27D86A, a));
         } else if (!this.active) {
-            DeuRender.roundRect(g, x, y, w, h, r, DeuRender.argb(0x070A08, Math.min(a, 170)));
+            DeuRender.roundRect(g, x, y, w, h, r, DeuRender.argb(0x0C0D10, Math.min(a, 170)));
         } else {
-            if (hover) DeuRender.roundRect(g, x - 1, y - 1, w + 2, h + 2, r + 1, DeuRender.argb(0x2EFF7A, a));
-            DeuRender.roundRect(g, x, y, w, h, r, DeuRender.argb(hover ? 0x141A16 : 0x0A0F0C, Math.min(a, hover ? 245 : 225)));
+            DeuRender.roundRect(g, x, y, w, h, r, DeuRender.argb(hover ? 0x262A31 : 0x16181D, Math.min(a, hover ? 245 : 230)));
         }
         ci.cancel();
     }
