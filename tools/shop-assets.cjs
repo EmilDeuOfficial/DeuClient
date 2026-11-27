@@ -12,7 +12,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const defaultAssets = path.resolve(__dirname, '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore');
+const defaultAssets = path.resolve(__dirname, '..', 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore');
 const defaultShopDir = path.resolve(__dirname, '..', 'public', 'cosmetics');
 
 function copyFolder(src, dst) {

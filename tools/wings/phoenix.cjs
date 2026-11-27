@@ -20,7 +20,7 @@ const crypto = require('crypto');
 const { PNG } = require('pngjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const RES = path.join(ROOT, 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore');
+const RES = path.join(ROOT, 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore');
 const TEX_PATH = path.join(RES, 'textures', 'cosmetics', 'wings', 'phoenix.png');
 const ATLAS = 256;
 const D2R = Math.PI / 180;

@@ -12,7 +12,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { Resvg } = require('@resvg/resvg-js');
 
-const assets = path.resolve(__dirname, '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore');
+const assets = path.resolve(__dirname, '..', 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore');
 const viewDir = path.join(__dirname, 'capes');
 
 const f = (v) => +v.toFixed(2);

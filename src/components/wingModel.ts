@@ -1,7 +1,7 @@
 /**
  * 3D-Fluegelmodell aus einer Blockbench-Datei (public/cosmetics/wings/<id>.bbmodel) fuer die Anprobe im Launcher.
  *
- * Gleiche Regeln wie der Lader im Spiel (mod/mc26.3/.../cosmetics/WingModel.java, Spec: tools/wings/SPEC.md):
+ * Gleiche Regeln wie der Lader im Spiel (mod/mc26/.../cosmetics/WingModel.java, Spec: tools/wings/SPEC.md):
  * nur Cubes, Per-Face-UV (v = 0 ist oben in der Textur, normiert mit "resolution"), Flaechen ohne Textur entfallen,
  * Gruppen bilden die Hierarchie (Pivot + Ruhe-Rotation). Animation nach Gruppennamen: "wing" = Oeffnungswinkel und
  * Flap, "segN" (N >= 2) = phasenverzoegerter Roll, "f_*" = leichtes Wiegen.

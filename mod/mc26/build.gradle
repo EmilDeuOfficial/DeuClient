@@ -1,0 +1,111 @@
+// DeuCore fuer Minecraft 26.x - rein optische Fabric-Mod + Deu-Menü (Rechts-Shift) für DeuClient
+// Ein Quellcode fuer alle 26er Versionen: gradlew build -Ptarget=26.2 (ohne Angabe: 26.3)
+//   targets/<ziel>.properties   Minecraft- und Fabric-API-Version, Plattform, Umbenennungen
+//   platform/<name>/java        Klassen, die sich je Plattform unterscheiden (26.3 nutzt SDL statt GLFW)
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
+    id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" apply false
+}
+
+def target = providers.gradleProperty('target').getOrElse('26.3')
+def conf = new Properties()
+file("targets/${target}.properties").withInputStream { conf.load(it) }
+// zum Testen einer Unterversion: -Poverride_minecraft_version=26.1 -Poverride_fabric_api_version=...
+['minecraft_version', 'fabric_api_version'].each { key ->
+    def value = providers.gradleProperty("override_${key}").getOrNull()
+    if (value) conf.setProperty(key, value)
+}
+def testRun = providers.gradleProperty('override_minecraft_version').getOrNull()
+// bis 1.21.11 ist Minecraft verschleiert: dann mit Mojang-Namen uebersetzen und zurueckwandeln
+def obfuscated = conf.getProperty('obfuscated') == 'true'
+def javaRelease = (conf.getProperty('java') ?: '25') as int
+apply plugin: obfuscated ? 'net.fabricmc.fabric-loom-remap' : 'net.fabricmc.fabric-loom'
+def list = { String key, String separator -> (conf.getProperty(key) ?: '').tokenize(separator) }
+// Umbenennungen: renames=<datei>,<datei> aus dem Ordner renames/, Zeilen "alt => neu", der Reihe nach angewandt
+def renames = list('renames', ',').collectMany { name ->
+    file("renames/${name}.txt").readLines('UTF-8').findAll { it.trim() && !it.startsWith('#') }.collect { line ->
+        line.split('=>', 2).collect { it.trim() }
+    }
+}
+def skipMixins = list('skip_mixins', ',')
+def platforms = list('platform', ',')
+
+version = project.mod_version
+group = project.maven_group
+layout.buildDirectory = layout.projectDirectory.dir("build/${target}")
+
+base {
+    archivesName = project.archives_base_name
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${conf.getProperty('minecraft_version')}"
+    if (obfuscated) mappings loom.officialMojangMappings()
+    def mod = obfuscated ? 'modImplementation' : 'implementation'
+    add mod, "net.fabricmc:fabric-loader:${project.loader_version}"
+    add mod, "net.fabricmc.fabric-api:fabric-api:${conf.getProperty('fabric_api_version')}"
+}
+
+// Jede Version hat ihren eigenen Ordner fuer den Entwicklungs-Client
+loom {
+    runs {
+        configureEach { runDir testRun ? "run/${testRun}" : target == '26.3' ? 'run' : "run/${target}" }
+    }
+}
+
+// Gemeinsamer Quellcode und die Plattform-Ordner des Ziels
+def sourceDirs = ['src/main/java'] + platforms.collect { "platform/${it}/java" }
+
+// Aeltere Versionen: Quellcode mit angepassten Namen kopieren
+def renamedSources = tasks.register('renamedSources', Sync) {
+    from sourceDirs
+    // eine Datei im spaeteren Ordner ersetzt die gleichnamige aus dem gemeinsamen Quellcode
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    into layout.buildDirectory.dir('renamed-src')
+    filteringCharset = 'UTF-8'
+    inputs.property 'renames', renames.toString()
+    filter { String line -> renames.inject(line) { text, pair -> text.replace(pair[0], pair[1]) } }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = renames ? [renamedSources] : sourceDirs
+            skipMixins.findAll { it != 'WindowAccessor' }.each { exclude "**/mixin/${it}.java" }
+        }
+    }
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'target', conf.toString()
+    filesMatching('fabric.mod.json') {
+        expand 'version': project.version, 'minecraft_range': conf.getProperty('minecraft_range'), 'java': javaRelease
+    }
+    filesMatching('deucore.mixins.json') {
+        // Zeilen von Mixins entfernen, die es in dieser Version nicht gibt
+        filter { String line -> skipMixins.any { line.trim().startsWith("\"${it}\"") } ? null : line.replace('JAVA_25', "JAVA_${javaRelease}") }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = javaRelease
+    it.options.encoding = 'UTF-8'
+    it.options.compilerArgs += ['-Xmaxerrs', '2000']
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion(javaRelease)
+    targetCompatibility = JavaVersion.toVersion(javaRelease)
+}
+
+// Fertiges JAR wie beim Spieler starten (nicht die Entwicklungsumgebung): gradlew prodClient -Ptarget=<ziel>
+dependencies {
+    productionRuntimeMods "net.fabricmc.fabric-api:fabric-api:${conf.getProperty('fabric_api_version')}"
+}
+tasks.register('prodClient', net.fabricmc.loom.task.prod.ClientProductionRunTask) {
+    runDir = layout.projectDirectory.dir("run/prod-${testRun ?: target}")
+    // -PprodJar=<pfad>: ein schon gebautes JAR pruefen, z. B. das 26.1-JAR auf 26.1.1
+    def prodJar = providers.gradleProperty("prodJar").getOrNull()
+    if (prodJar) mods.setFrom(file(prodJar), configurations.productionRuntimeMods)
+}

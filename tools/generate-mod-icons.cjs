@@ -8,7 +8,7 @@ const { Resvg } = require('@resvg/resvg-js');
 const { PNG } = require('pngjs');
 
 const img = path.resolve(__dirname, '..', 'img');
-const out = path.resolve(__dirname, '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore', 'textures', 'gui', 'icons_hd');
+const out = path.resolve(__dirname, '..', 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore', 'textures', 'gui', 'icons_hd');
 const NAMES = ['armor', 'call', 'cape', 'color-palette', 'compass', 'crosshair', 'eye', 'fps', 'hangup', 'headphones', 'headphones-off', 'info', 'keyboard', 'mic', 'mic-off', 'volume', 'location', 'ping', 'speed', 'tag', 'time', 'wings', 'zoom'];
 
 /** img/wing.svg zeigt nur einen Fluegel: das Icon "wings" setzt ihn und sein Spiegelbild nebeneinander */

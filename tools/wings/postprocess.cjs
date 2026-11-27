@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { PNG } = require('pngjs');
 
-const assets = path.resolve(__dirname, '..', '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore');
+const assets = path.resolve(__dirname, '..', '..', 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore');
 const ARM = /bone|arm|humerus|forearm|shoulder|elbow|wrist|knob|orb|gem|sg_|claw|spur|thumb|spk/i;
 const HALO = /halo|glow/i;
 const SPREAD = 0.35; // verbleibender Anteil der urspruenglichen Tiefenstaffelung

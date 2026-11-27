@@ -26,6 +26,8 @@ export interface ManagedMod {
   description?: string;
   /** true = DeuCore (Kernmod, immer aktiv solange vorhanden) */
   core: boolean;
+  /** Ordner unter resources/mods, falls er anders heisst als die Minecraft-Version (ein JAR fuer mehrere) */
+  dir?: string;
 }
 
 interface Manifest {
@@ -45,7 +47,8 @@ export function deuCoreInfo(): { version: string; minecraft: string[] } | null {
   const versions = Object.keys(m.deucore);
   if (!versions.length) return null;
   const short = (v: string) => v.replace(/^(\d+\.\d+)\.0$/, '$1');
-  return { version: versions.map((v) => `${short(m.deucore[v])} (${v})`).join(', '), minecraft: versions };
+  const modVersions = [...new Set(versions.map((v) => short(m.deucore[v])))];
+  return { version: modVersions.join(', '), minecraft: versions.sort((a, b) => a.localeCompare(b, undefined, { numeric: true })) };
 }
 
 export function managedModsFor(inst: Instance): ManagedMod[] {
@@ -99,7 +102,7 @@ export async function syncDeuCore(inst: Instance): Promise<string> {
 
   const changed: string[] = [];
   for (const mod of wanted) {
-    const source = path.join(bundledModsDir(), inst.mcVersion, mod.file);
+    const source = path.join(bundledModsDir(), mod.dir ?? inst.mcVersion, mod.file);
     if (!fs.existsSync(source)) continue;
     const enabled = path.join(modsDir, mod.file);
     const disabled = `${enabled}.disabled`;

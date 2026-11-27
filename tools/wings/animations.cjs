@@ -18,7 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const dir = path.resolve(__dirname, '..', '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore', 'models', 'wings');
+const dir = path.resolve(__dirname, '..', '..', 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore', 'models', 'wings');
 const IDS = ['engel', 'daemon', 'eis', 'phoenix', 'schatten', 'smaragd'];
 const TAU = Math.PI * 2;
 const wave = (p, shift = 0) => Math.sin(TAU * (p - shift));

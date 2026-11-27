@@ -17,7 +17,7 @@ const crypto = require('crypto');
 const { PNG } = require('pngjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const ASSETS = path.join(ROOT, 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore');
+const ASSETS = path.join(ROOT, 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore');
 const OUT_MODEL = path.join(ASSETS, 'models', 'wings', 'engel.bbmodel');
 const OUT_TEX = path.join(ASSETS, 'textures', 'cosmetics', 'wings', 'engel.png');
 const OUT_MENU = path.join(ASSETS, 'textures', 'cosmetics', 'ui', 'wings_engel.png');

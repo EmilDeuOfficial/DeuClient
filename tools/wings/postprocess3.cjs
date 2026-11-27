@@ -8,7 +8,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const dir = path.resolve(__dirname, '..', '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore', 'models', 'wings');
+const dir = path.resolve(__dirname, '..', '..', 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore', 'models', 'wings');
 const round = (v) => Math.round(v * 1000) / 1000;
 const BAR = /bone|_bar|keel|^arm|humerus|forearm/i;
 

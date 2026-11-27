@@ -1,0 +1,58 @@
+# 1.21.11: GUI-Methoden heissen "render..." statt "extract..."; Regeln gelten der Reihe nach
+GuiGraphicsExtractor => GuiGraphics
+
+# Spielerkopf, Chat, Zeit, Items
+PlayerFaceExtractor.extractRenderState( => PlayerFaceRenderer.draw(
+PlayerFaceExtractor => PlayerFaceRenderer
+addClientSystemMessage( => addMessage(
+getOverworldClockTime() => getDayTime()
+g.item( => g.renderItem(
+g.entity( => g.submitEntityRenderState(
+
+# Zeichnen
+.centeredText( => .drawCenteredString(
+g.text( => g.drawString(
+g.outline( => g.renderOutline(
+text(Lnet => drawString(Lnet
+centeredText(Lnet => drawCenteredString(Lnet
+;outline( => ;renderOutline(
+
+# Methoden von Bildschirmen und Knoepfen (Entity-Renderer behalten "extractRenderState")
+extractRenderState(GuiGraphics => render(GuiGraphics
+extractRenderState(net.minecraft.client.gui.GuiGraphics => render(net.minecraft.client.gui.GuiGraphics
+super.extractRenderState( => super.render(
+original.extractRenderState( => original.render(
+"extractRenderState" => "render"
+extractWidgetRenderState => renderWidget
+extractContent => renderContent
+extractDefaultSprite => renderDefaultSprite
+extractDefaultLabel => renderDefaultLabel
+extractDeferredSubtitles => renderDeferredSubtitles
+extractTransparentBackground => renderTransparentBackground
+extractMenuBackground => renderMenuBackground
+extractBlurredBackground => renderBlurredBackground
+extractBackground => renderBackground
+extractPanorama => renderPanorama
+extractWindow => renderWindow
+extractMultilineText => drawMultilineText
+extractHover => drawHover
+extractChunksForRendering => renderChunks
+extractProgressBar => drawProgressBar
+extractTooltipBackground => renderTooltipBackground
+
+# Zeichenwege, durch die die Themefarbe laeuft
+innerFill( => submitColoredRectangle(
+innerBlit( => submitBlit(
+
+# Fabric API
+serverboundPlay() => playC2S()
+clientboundPlay() => playS2C()
+ServerboundPlayChannelEvents => C2SPlayChannelEvents
+AfterExtract => AfterRender
+afterExtract( => afterRender(
+MOB_EFFECTS => STATUS_EFFECTS
+, Minecraft.getInstance().level != null) => )
+
+# Mauszeiger ueber Schiebereglern
+@Shadow protected abstract void handleCursor(GuiGraphics g); =>
+this.handleCursor(g) => g.requestCursor(com.mojang.blaze3d.platform.cursor.CursorTypes.POINTING_HAND)

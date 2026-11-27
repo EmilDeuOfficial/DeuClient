@@ -1,7 +1,7 @@
 # DeuClient wing models - shared spec
 
 Goal: replace the old flat galaxy wings (two textured quads per side) with real 3D wing models made in
-Blockbench (.bbmodel), loaded at runtime by the DeuCore mod (Minecraft 26.3, `mod/mc26.3`).
+Blockbench (.bbmodel), loaded at runtime by the DeuCore mod (Minecraft 26.3, `mod/mc26`).
 
 There are six styles, ids must not change: `engel`, `daemon`, `eis`, `phoenix`, `schatten`, `smaragd`.
 Old palettes (for the colour theme, keep the spirit): see `WINGS` in `tools/generate-ingame-ui.cjs`.
@@ -10,9 +10,9 @@ Old palettes (for the colour theme, keep the spirit): see `WINGS` in `tools/gene
 
 | What | Path |
 |------|------|
-| Model | `mod/mc26.3/src/main/resources/assets/deucore/models/wings/<id>.bbmodel` |
-| Texture atlas | `mod/mc26.3/src/main/resources/assets/deucore/textures/cosmetics/wings/<id>.png` |
-| Menu preview | `mod/mc26.3/src/main/resources/assets/deucore/textures/cosmetics/ui/wings_<id>.png` |
+| Model | `mod/mc26/src/main/resources/assets/deucore/models/wings/<id>.bbmodel` |
+| Texture atlas | `mod/mc26/src/main/resources/assets/deucore/textures/cosmetics/wings/<id>.png` |
+| Menu preview | `mod/mc26/src/main/resources/assets/deucore/textures/cosmetics/ui/wings_<id>.png` |
 | Generator script (optional, recommended) | `tools/wings/<id>.cjs` |
 
 Delete nothing else. The old `<id>_lower.png` files are removed later by the renderer agent.

@@ -22,7 +22,7 @@ const { Resvg } = require('@resvg/resvg-js');
 const ROOT = path.resolve(__dirname, '..', '..');
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 ? argv[i + 1] : d; };
-const TEX_OUT = arg('--tex', path.join(ROOT, 'mod/mc26.3/src/main/resources/assets/deucore/textures/cosmetics/wings/smaragd.png'));
+const TEX_OUT = arg('--tex', path.join(ROOT, 'mod/mc26/src/main/resources/assets/deucore/textures/cosmetics/wings/smaragd.png'));
 const OPS_OUT = arg('--ops', path.join(os.tmpdir(), 'smaragd-ops.json'));
 const DEBUG_OUT = arg('--debug', '');
 

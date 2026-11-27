@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 
-const src = path.resolve(__dirname, '..', '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore', 'models', 'wings');
+const src = path.resolve(__dirname, '..', '..', 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore', 'models', 'wings');
 const out = path.join(__dirname, 'paare');
 fs.mkdirSync(out, { recursive: true });
 const clone = (o) => JSON.parse(JSON.stringify(o));

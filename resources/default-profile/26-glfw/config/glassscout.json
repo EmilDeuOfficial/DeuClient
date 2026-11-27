@@ -1,0 +1,15 @@
+{
+  "mode": 0,
+  "showExtras": true,
+  "accent": 3,
+  "opacity": 92,
+  "commands": [
+    "invsee",
+    "openinv",
+    "oi",
+    "inv",
+    "invs",
+    "inventorysee",
+    "einsehen"
+  ]
+}

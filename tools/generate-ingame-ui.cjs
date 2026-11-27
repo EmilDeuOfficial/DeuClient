@@ -8,7 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Resvg } = require('@resvg/resvg-js');
 
-const assets = path.resolve(__dirname, '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore');
+const assets = path.resolve(__dirname, '..', 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore');
 const write = (rel, buf) => {
   const f = path.join(assets, rel);
   fs.mkdirSync(path.dirname(f), { recursive: true });

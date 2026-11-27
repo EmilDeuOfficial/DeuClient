@@ -1,0 +1,3 @@
+# Bis 26.2 lagen diese Klassen unter com.mojang.blaze3d
+com.mojang.renderpearl.api => com.mojang.blaze3d
+com/mojang/renderpearl/api => com/mojang/blaze3d

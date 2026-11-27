@@ -11,7 +11,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { PNG } = require('pngjs');
 
-const assets = path.resolve(__dirname, '..', '..', 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore');
+const assets = path.resolve(__dirname, '..', '..', 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore');
 const ARM = /bone|arm|humerus|forearm|shoulder|knob|orb/i;
 const SKIP = /halo|glow|barb|spur|claw|keel|star|spk|gem|^mem|connector/i;
 const round = (v) => Math.round(v * 1000) / 1000;

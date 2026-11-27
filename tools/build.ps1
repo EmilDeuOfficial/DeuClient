@@ -1,6 +1,6 @@
 # ============================================================
 #  DeuClient - full build (run: tools/build.ps1)
-#  1. Build the DeuCore mods (1.21.4 and 26.3, Gradle)
+#  1. Build the DeuCore mods (Gradle, one jar per file in mod\<project>\targets)
 #  2. Build the launcher (icons, embed mods, Electron, installer)
 #  Result: release\DeuClient-Setup.exe
 # ============================================================
@@ -10,8 +10,16 @@ $root = Split-Path -Parent $PSScriptRoot
 foreach ($mod in Get-ChildItem "$root\mod" -Directory -Filter 'mc*') {
     Write-Host "`nBuilding DeuCore ($($mod.Name)) ..." -ForegroundColor Green
     Push-Location $mod.FullName
-    .\gradlew.bat build --no-daemon
-    if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Mod build $($mod.Name) failed" }
+    $targets = @(Get-ChildItem "$($mod.FullName)\targets" -Filter '*.properties' -ErrorAction SilentlyContinue | ForEach-Object { $_.BaseName })
+    if ($targets.Count -eq 0) {
+        .\gradlew.bat build --no-daemon
+        if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Mod build $($mod.Name) failed" }
+    }
+    foreach ($target in $targets) {
+        Write-Host "  Minecraft $target" -ForegroundColor Green
+        .\gradlew.bat build "-Ptarget=$target" --no-daemon
+        if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Mod build $($mod.Name) $target failed" }
+    }
     Pop-Location
 }
 

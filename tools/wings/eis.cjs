@@ -16,7 +16,7 @@ const crypto = require('crypto');
 const { PNG } = require('pngjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const RES = path.join(ROOT, 'mod', 'mc26.3', 'src', 'main', 'resources', 'assets', 'deucore');
+const RES = path.join(ROOT, 'mod', 'mc26', 'src', 'main', 'resources', 'assets', 'deucore');
 const OUT_MODEL = path.join(RES, 'models', 'wings', 'eis.bbmodel');
 const OUT_TEX = path.join(RES, 'textures', 'cosmetics', 'wings', 'eis.png');
 const OUT_PREVIEW = path.join(RES, 'textures', 'cosmetics', 'ui', 'wings_eis.png');

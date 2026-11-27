@@ -76,7 +76,12 @@ function applyProfileTemplate(inst: Instance): void {
     const options = path.join(root, 'options.txt');
     const target = path.join(dir, 'options.txt');
     if (fs.existsSync(options) && !fs.existsSync(target)) fs.copyFileSync(options, target);
-    if (inst.loader === 'fabric') copyTree(path.join(root, inst.mcVersion), dir);
+    if (inst.loader === 'fabric') {
+      // vor 26.3 zaehlt Minecraft die Tasten anders (GLFW): gemeinsame Vorlage fuer diese Versionen
+      const own = path.join(root, inst.mcVersion);
+      const older = /^(26\.[12](\.\d+)?|1\.21\.11)$/.test(inst.mcVersion);
+      copyTree(!fs.existsSync(own) && older ? path.join(root, '26-glfw') : own, dir);
+    }
   } catch {
     // Vorlage nicht lesbar: Modpack startet mit den Minecraft-Standardwerten
   }

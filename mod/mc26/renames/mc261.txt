@@ -1,0 +1,6 @@
+# Bis 26.1: Minecraft verwaltet die Screens selbst
+.gui.setScreen( => .setScreen(
+.gui.screen() => .screen
+mc.gameRenderer.mainRenderTarget() => mc.getMainRenderTarget()
+.gui.hud. => .gui.
+EntityTypes => EntityType

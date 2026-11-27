@@ -1,7 +1,7 @@
 # DeuClient
 
 ![Version](https://img.shields.io/badge/version-v1.0-2EFF7A)
-![Minecraft](https://img.shields.io/badge/Minecraft-26.3-1C1C1C)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11%20%7C%2026.1%20to%2026.3-1C1C1C)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-1C1C1C)
 ![License](https://img.shields.io/badge/license-proprietary-22C55E)
 
@@ -25,7 +25,7 @@ DeuClient is a Minecraft launcher for Windows with its own Fabric client mod, **
 - Finds Java or downloads Eclipse Temurin, parallel downloads with checksum verification
 - NSIS installer in a dark design, automatic updates from GitHub releases
 
-### DeuCore (Minecraft 26.3)
+### DeuCore (Minecraft 1.21.11 and 26.1 to 26.3)
 
 - Own main menu, loading screen, pause menu, buttons, tooltips and advancement window
 - Mod menu on **Right Shift** with favorites, search and categories
@@ -36,7 +36,12 @@ DeuClient is a Minecraft launcher for Windows with its own Fabric client mod, **
 - **Scout**: summary card next to another player's inventory when a server lets you open it (for example `/invsee`)
 - German and English, following the Minecraft language
 
-A smaller DeuCore for Minecraft 1.21.4 is included as well (design and main menu).
+| Minecraft | DeuCore |
+| --- | --- |
+| 26.1, 26.1.1, 26.1.2, 26.2, 26.3 | Full |
+| 1.21.11 | Full |
+| 1.21.4 | Small version: design and main menu |
+| Other versions | Not available yet; the launcher still starts them with Fabric |
 
 ## Install
 
@@ -53,7 +58,7 @@ You need Windows 10 or 11 (x64). Java is handled by the launcher.
 | JDK 25 or newer | DeuCore mods |
 | Git | Getting the source |
 
-Everything in one step (both mods, then the launcher and installer):
+Everything in one step (all mod versions, then the launcher and installer):
 
 ```powershell
 git clone https://github.com/EmilDeuOfficial/DeuClient.git
@@ -84,7 +89,7 @@ npm run start
 | `npm run dev` | Vite dev server with hot reload for the interface |
 | `npm run start` | Builds and starts the launcher |
 | `npm run typecheck` | TypeScript check for interface and main process |
-| `npm run build` | Icons, embedded mods, launcher and installer (both mods must be built first) |
+| `npm run build` | Icons, embedded mods, launcher and installer (all mod versions must be built first) |
 | `npm run release` | Publishes the built installer as a GitHub release |
 
 More in the wiki: [Building](https://github.com/EmilDeuOfficial/DeuClient/wiki/Building), [Development](https://github.com/EmilDeuOfficial/DeuClient/wiki/Development), [Releases](https://github.com/EmilDeuOfficial/DeuClient/wiki/Releases-and-Updates).
@@ -95,7 +100,7 @@ More in the wiki: [Building](https://github.com/EmilDeuOfficial/DeuClient/wiki/B
 electron/    Launcher main process (login, game start, modpacks, Modrinth, servers, worlds)
 src/         Launcher interface (React, Tailwind)
 shared/      Types shared by both
-mod/         DeuCore, one Gradle project per Minecraft version (mc26.3, mc1.21.4)
+mod/         DeuCore: mc26 (one source for 1.21.11 and 26.x) and mc1.21.4 (small version)
 resources/   Files shipped with the launcher (DeuCore jars, default settings)
 tools/       Build and asset scripts (icons, fonts, capes, wings)
 img/         Logo and icon sources
