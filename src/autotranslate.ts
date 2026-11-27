@@ -26,6 +26,8 @@ const EN: Record<string, string> = {
   'Die Anmeldung wurde abgelehnt. Melde dich neu mit Microsoft an.': 'The login was rejected. Sign in with Microsoft again.',
   'Der Server hat gerade ein Problem. Versuche es in ein paar Minuten erneut.': 'The server has a problem right now. Try again in a few minutes.',
   'Eine heruntergeladene Datei ist beschädigt. Versuche es erneut - der Launcher lädt sie dann neu.': 'A downloaded file is corrupt. Try again - the launcher will download it again.',
+  'Das neue Release hat keinen prüfbaren Installer.': 'The new release has no installer that can be verified.',
+  'Updates gibt es nur in der installierten Version.': 'Updates are only available in the installed version.',
   'Java wurde nicht gefunden oder konnte nicht gestartet werden. Der Launcher lädt Java normalerweise selbst herunter; prüfe sonst in den Einstellungen den Java-Pfad.': 'Java was not found or could not be started. The launcher normally downloads Java itself; otherwise check the Java path in the settings.',
   'Minecraft bekommt nicht genug Arbeitsspeicher. Verringere den Arbeitsspeicher in den Einstellungen oder schließe andere Programme.': 'Minecraft does not get enough memory. Reduce the memory in the settings or close other programs.',
   'Löschen': 'Delete',

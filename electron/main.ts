@@ -451,7 +451,6 @@ if (!process.env.DEUCLIENT_SCREENSHOT && !app.requestSingleInstanceLock()) {
     servers.setServerEmitter((channel, payload) => emit(channel as keyof EventMap, payload as never));
     createMainWindow();
     if (!process.env.DEUCLIENT_SCREENSHOT) initUpdater((s) => emit('update:status', s));
-    if (!process.env.DEUCLIENT_SCREENSHOT) initUpdater((s) => emit('update:status', s));
     if (process.env.DEUCLIENT_SCREENSHOT) runScreenshotTest();
   });
   app.on('window-all-closed', () => app.quit());
