@@ -635,6 +635,35 @@ public final class DeuRender {
         }
     }
 
+    /** Ziffern 0-9 und das Prozentzeichen der Minecraft-Schrift: 7 Zeilen mit je 5 Punkten (Bit 4 = links) */
+    private static final int[][] PERCENT_GLYPHS = {
+            {14, 17, 19, 21, 25, 17, 14}, {4, 12, 4, 4, 4, 4, 31}, {14, 17, 1, 6, 8, 17, 31}, {14, 17, 1, 6, 1, 17, 14},
+            {3, 5, 9, 17, 31, 1, 1}, {31, 16, 30, 1, 1, 17, 14}, {6, 8, 16, 30, 17, 17, 14}, {31, 17, 1, 2, 4, 4, 4},
+            {14, 17, 17, 14, 17, 17, 14}, {14, 17, 17, 15, 1, 2, 12}, {17, 18, 2, 4, 8, 9, 17}};
+
+    /**
+     * Prozentzahl im Aussehen der Minecraft-Schrift samt Schatten, aber nur aus Rechtecken:
+     * beim ersten Laden sind bis 26.2 die Text-Shader noch nicht bereit.
+     */
+    public static void percent(GuiGraphicsExtractor g, int centerX, int y, float progress, int color) {
+        String text = Math.round(Mth.clamp(progress, 0f, 1f) * 100) + "%";
+        int x = centerX - text.length() * 3;
+        int shadow = color & 0xFF000000 | (color & 0xFCFCFC) >> 2;
+        for (int pass = 1; pass >= 0; pass--) {
+            for (int i = 0; i < text.length(); i++) {
+                char c = text.charAt(i);
+                int[] rows = PERCENT_GLYPHS[c == '%' ? 10 : c - '0'];
+                for (int row = 0; row < rows.length; row++) {
+                    for (int col = 0; col < 5; col++) {
+                        if ((rows[row] & 16 >> col) == 0) continue;
+                        int px = x + i * 6 + col + pass, py = y + row + pass;
+                        g.fill(px, py, px + 1, py + 1, pass == 1 ? shadow : color);
+                    }
+                }
+            }
+        }
+    }
+
     /** Deu-Fortschrittsbalken: gruen/dunkel, saubere runde Enden, laufender Glanz nur innerhalb der Fuellung */
     public static void progressBar(GuiGraphicsExtractor g, int x, int y, int w, int h, float progress, int alpha) {
         double k = totalScale(g);

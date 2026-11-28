@@ -19,9 +19,6 @@ import java.io.InputStream;
 public final class Platform {
     private Platform() {}
 
-    /** Ab 26.3 sind die Text-Shader schon im Ladebildschirm da */
-    public static final boolean TEXT_WHILE_LOADING = true;
-
     public static boolean keyDown(int key) {
         return InputConstants.isKeyDown(key);
     }

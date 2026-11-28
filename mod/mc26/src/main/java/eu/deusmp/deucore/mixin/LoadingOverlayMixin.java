@@ -2,7 +2,6 @@ package eu.deusmp.deucore.mixin;
 
 import eu.deusmp.deucore.DeuConfig;
 import eu.deusmp.deucore.DeuRender;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.LoadingOverlay;
 import net.minecraft.util.Mth;
@@ -81,11 +80,7 @@ public abstract class LoadingOverlayMixin {
             int bw = Math.min(260, (int) (w * 0.6f));
             int by = top + lh + 24;
             DeuRender.progressBar(g, w / 2 - bw / 2, by, bw, 10, this.currentProgress, ba);
-            if (eu.deusmp.deucore.compat.Platform.TEXT_WHILE_LOADING) {
-                String pct = Math.round(this.currentProgress * 100) + "%";
-                var font = Minecraft.getInstance().font;
-                g.text(font, pct, w / 2 - font.width(pct) / 2, by + 15, DeuRender.argb(DeuRender.GOLD_LIGHT, ba), true);
-            }
+            DeuRender.percent(g, w / 2, by + 15, this.currentProgress, DeuRender.argb(DeuRender.GOLD_LIGHT, ba));
         }
     }
 }

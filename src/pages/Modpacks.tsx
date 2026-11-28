@@ -28,11 +28,22 @@ export function Modpacks() {
   return inst ? <ModpackDetail inst={inst} /> : <ModpackList />;
 }
 
+/** Kennzeichnung des Standard-Modpacks */
+function DefaultBadge({ label, className = '' }: { label: string; className?: string }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border border-accent-400/40 bg-accent-400/15 py-1 pl-2 pr-2.5 text-[11px] font-semibold leading-none text-accent-200 ${className}`}>
+      <Icon name="star" size={11} fill="currentColor" /> {label}
+    </span>
+  );
+}
+
 /* ====================== Übersicht ====================== */
 
 function ModpackList() {
-  const { t, instances, selectedInstance, openPack, launch, launching, game, accounts, toast } = useApp();
+  const { t, instances, selectedInstance, openPack, launch, launching, game, accounts, toast, settings, updateSettings } = useApp();
   const [editing, setEditing] = useState(false);
+  const compact = settings?.packView === 'compact';
+  const play = (id: string) => (accounts.activeUuid ? launch(id) : toast(t('home.loginFirst'), 'error'));
   const [core, setCore] = useState<string[]>([]);
   useEffect(() => void api.app.deuCore().then((i) => setCore(i?.minecraft ?? [])), []);
 
@@ -56,6 +67,24 @@ function ModpackList() {
           <p className="mt-1 text-sm text-ink-200/60">{t('pack.subtitle')}</p>
         </div>
         <div className="flex shrink-0 gap-2">
+          <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white/[0.03] p-1">
+            {(['cards', 'compact'] as const).map((view) => {
+              const active = compact === (view === 'compact');
+              const label = t(view === 'compact' ? 'pack.viewCompact' : 'pack.viewCards');
+              return (
+                <button
+                  key={view}
+                  title={label}
+                  aria-label={label}
+                  aria-pressed={active}
+                  onClick={() => updateSettings({ packView: view })}
+                  className={`flex h-full w-9 items-center justify-center rounded-lg transition ${active ? 'bg-accent-400 text-ink-950' : 'text-ink-200/70 hover:bg-white/10 hover:text-ink-100'}`}
+                >
+                  <Icon name={view === 'compact' ? 'rows' : 'grid'} size={16} />
+                </button>
+              );
+            })}
+          </div>
           <button className="btn-ghost" onClick={importPack}>
             <Icon name="upload" size={16} /> {t('inst.import')}
           </button>
@@ -65,63 +94,108 @@ function ModpackList() {
         </div>
       </div>
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
-        {instances.map((inst, i) => {
-          const selected = inst.id === selectedInstance?.id;
-          const hasCore = inst.loader === 'fabric' && core.includes(inst.mcVersion);
-          return (
+      {compact ? (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-2.5">
+          {instances.map((inst) => (
             <div
               key={inst.id}
-              style={{ animationDelay: `${i * 40}ms` }}
               onClick={() => openPack(inst.id)}
-              className={`card card-hover group relative flex cursor-pointer flex-col overflow-hidden ${selected ? 'border-accent-400/50' : ''}`}
+              className={`card card-hover flex cursor-pointer items-center gap-3 p-2.5 ${inst.id === selectedInstance?.id ? 'border-accent-400/50' : ''}`}
             >
-              {/* Banner */}
-              <div className="relative h-24 overflow-hidden bg-ink-800">
-                {inst.isDefault && <span className="badge absolute left-4 top-3 bg-accent-400/90 text-ink-950">✦ {t('inst.default')}</span>}
-              </div>
-              <div className="relative -mt-9 flex items-end gap-3 px-5">
-                <InstanceIcon icon={inst.icon} size={64} className="rounded-xl ring-2 ring-ink-850" />
-                <div className="min-w-0 pb-1">
-                  <div className="truncate font-display text-lg font-bold">{inst.name}</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    <span className="badge bg-white/10 text-ink-100">{inst.mcVersion}</span>
-                    <span className={`badge ${inst.loader === 'fabric' ? 'bg-accent-400/15 text-accent-200' : 'bg-white/10 text-ink-100'}`}>{inst.loader}</span>
-                    {hasCore && <span className="badge bg-ink-300/20 text-ink-100">DeuCore</span>}
-                  </div>
+              <InstanceIcon icon={inst.icon} size={40} className="shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-sm font-bold" title={inst.name}>{inst.name}</span>
+                  {inst.isDefault && (
+                    <span className="shrink-0 text-accent-400" title={t('inst.default')}>
+                      <Icon name="star" size={12} fill="currentColor" />
+                    </span>
+                  )}
+                </div>
+                <div className="truncate text-[11px] capitalize text-ink-200/55">
+                  {inst.mcVersion} · {inst.loader}
                 </div>
               </div>
-              <p className="mx-5 mt-3 line-clamp-2 h-8 overflow-hidden text-ellipsis text-xs leading-4 text-ink-200/60">{inst.description ?? `${inst.loader === 'fabric' ? 'Fabric' : 'Vanilla'}-Modpack für Minecraft ${inst.mcVersion}`}</p>
-              <div className="mx-5 mt-3 flex items-center gap-4 text-[11px] text-ink-200/55">
-                <span className="flex items-center gap-1"><Icon name="clock" size={12} /> {formatPlayTime(inst.playTimeMs)}</span>
-                <span className="truncate">{inst.lastPlayed ? new Date(inst.lastPlayed).toLocaleDateString() : t('home.never')}</span>
-              </div>
-              <div className="mt-4 flex gap-2 border-t border-white/[0.06] p-4" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className="btn-accent flex-1"
-                  disabled={launching || game.running}
-                  onClick={() => (accounts.activeUuid ? launch(inst.id) : toast(t('home.loginFirst'), 'error'))}
-                >
-                  <Icon name="play" size={14} /> {t('inst.play')}
-                </button>
-                <button className="btn-ghost" onClick={() => openPack(inst.id)}>
-                  <Icon name="puzzle" size={15} /> {t('pack.open')}
-                </button>
-              </div>
+              <button
+                className="btn-accent h-9 w-9 shrink-0 !p-0"
+                title={t('inst.play')}
+                aria-label={t('inst.play')}
+                disabled={launching || game.running}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  play(inst.id);
+                }}
+              >
+                <Icon name="play" size={14} />
+              </button>
             </div>
-          );
-        })}
+          ))}
+          <button
+            onClick={() => setEditing(true)}
+            className="flex min-h-[62px] items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/10 text-sm font-semibold text-ink-200/60 transition hover:border-accent-400/50 hover:bg-accent-400/5 hover:text-accent-200"
+          >
+            <Icon name="plus" size={18} /> {t('inst.new')}
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-5">
+          {instances.map((inst, i) => {
+            const selected = inst.id === selectedInstance?.id;
+            const hasCore = inst.loader === 'fabric' && core.includes(inst.mcVersion);
+            return (
+              <div
+                key={inst.id}
+                style={{ animationDelay: `${i * 40}ms` }}
+                onClick={() => openPack(inst.id)}
+                className={`card card-hover group relative flex cursor-pointer flex-col overflow-hidden ${selected ? 'border-accent-400/50' : ''}`}
+              >
+                {/* Banner */}
+                <div className="relative h-24 overflow-hidden bg-ink-800">
+                  {inst.isDefault && <DefaultBadge label={t('inst.default')} className="absolute left-4 top-3" />}
+                </div>
+                <div className="relative -mt-9 flex items-end gap-3 px-5">
+                  <InstanceIcon icon={inst.icon} size={64} className="rounded-xl ring-2 ring-ink-850" />
+                  <div className="min-w-0 pb-1">
+                    <div className="truncate font-display text-lg font-bold">{inst.name}</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="badge bg-white/10 text-ink-100">{inst.mcVersion}</span>
+                      <span className={`badge ${inst.loader === 'fabric' ? 'bg-accent-400/15 text-accent-200' : 'bg-white/10 text-ink-100'}`}>{inst.loader}</span>
+                      {hasCore && <span className="badge bg-ink-300/20 text-ink-100">DeuCore</span>}
+                    </div>
+                  </div>
+                </div>
+                <p className="mx-5 mt-3 line-clamp-2 h-8 overflow-hidden text-ellipsis text-xs leading-4 text-ink-200/60">{inst.description ?? `${inst.loader === 'fabric' ? 'Fabric' : 'Vanilla'}-Modpack für Minecraft ${inst.mcVersion}`}</p>
+                <div className="mx-5 mt-3 flex items-center gap-4 text-[11px] text-ink-200/55">
+                  <span className="flex items-center gap-1"><Icon name="clock" size={12} /> {formatPlayTime(inst.playTimeMs)}</span>
+                  <span className="truncate">{inst.lastPlayed ? new Date(inst.lastPlayed).toLocaleDateString() : t('home.never')}</span>
+                </div>
+                <div className="mt-4 flex gap-2 border-t border-white/[0.06] p-4" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="btn-accent flex-1"
+                    disabled={launching || game.running}
+                    onClick={() => play(inst.id)}
+                  >
+                    <Icon name="play" size={14} /> {t('inst.play')}
+                  </button>
+                  <button className="btn-ghost" onClick={() => openPack(inst.id)}>
+                    <Icon name="puzzle" size={15} /> {t('pack.open')}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
 
-        <button
-          onClick={() => setEditing(true)}
-          className="flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-white/10 text-ink-200/60 transition hover:border-accent-400/50 hover:bg-accent-400/5 hover:text-accent-200"
-        >
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5">
-            <Icon name="plus" size={28} />
-          </span>
-          <span className="font-semibold">{t('inst.new')}</span>
-        </button>
-      </div>
+          <button
+            onClick={() => setEditing(true)}
+            className="flex min-h-[260px] flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-white/10 text-ink-200/60 transition hover:border-accent-400/50 hover:bg-accent-400/5 hover:text-accent-200"
+          >
+            <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/5">
+              <Icon name="plus" size={28} />
+            </span>
+            <span className="font-semibold">{t('inst.new')}</span>
+          </button>
+        </div>
+      )}
 
       <InstanceEditor open={editing} instance={null} onClose={() => setEditing(false)} />
     </div>
@@ -167,7 +241,7 @@ function ModpackDetail({ inst }: { inst: Instance }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h2 className="truncate font-display text-3xl font-black text-accent-gradient">{inst.name}</h2>
-              {inst.isDefault && <span className="badge bg-accent-400/90 text-ink-950">✦ {t('inst.default')}</span>}
+              {inst.isDefault && <DefaultBadge label={t('inst.default')} />}
             </div>
             <p className="mt-1 max-w-2xl text-sm text-ink-100/70">{inst.description ?? `${inst.loader === 'fabric' ? 'Fabric' : 'Vanilla'} · Minecraft ${inst.mcVersion}`}</p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">

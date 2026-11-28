@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   animations: true,
   themeColor: '#2eff7a',
   gamePriority: 'normal',
+  packView: 'cards',
 };
 
 let cache: Settings | null = null;

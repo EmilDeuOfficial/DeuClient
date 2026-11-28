@@ -61,6 +61,8 @@ const de = {
   'pack.danger': 'Gefahrenzone',
   'pack.versionWarn': 'Beim Wechsel der Minecraft-Version werden vorhandene Mods gesichert (mods_backup_…), weil sie nicht mehr passen.',
   'pack.open': 'Öffnen',
+  'pack.viewCards': 'Große Ansicht',
+  'pack.viewCompact': 'Kompakte Ansicht',
   'pack.mods': 'Mods',
 
   'extras.title': 'Empfohlen',
@@ -297,6 +299,8 @@ const en: Record<TKey, string> = {
   'pack.danger': 'Danger zone',
   'pack.versionWarn': 'Changing the Minecraft version backs up existing mods (mods_backup_…) because they no longer fit.',
   'pack.open': 'Open',
+  'pack.viewCards': 'Large view',
+  'pack.viewCompact': 'Compact view',
   'pack.mods': 'Mods',
   'extras.title': 'Recommended',
   'extras.subtitle': 'Hand-picked, allowed mods for more FPS, nicer visuals and comfort - one click into your modpack.',

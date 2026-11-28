@@ -21,9 +21,6 @@ import java.nio.IntBuffer;
 public final class Platform {
     private Platform() {}
 
-    /** Bis 26.2 fehlen die Text-Shader waehrend des ersten Ladens: dann nur den Balken zeichnen */
-    public static final boolean TEXT_WHILE_LOADING = false;
-
     public static boolean keyDown(int key) {
         return InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), key);
     }

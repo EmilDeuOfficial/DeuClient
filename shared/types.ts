@@ -118,6 +118,8 @@ export interface Settings {
   gamePriority: 'normal' | 'high';
   /** Themefarbe (#rrggbb) fuer Launcher und Spiel */
   themeColor: string;
+  /** Modpack-Bibliothek: grosse Karten oder kompakte Kacheln */
+  packView: 'cards' | 'compact';
 }
 
 export interface SystemInfo {
