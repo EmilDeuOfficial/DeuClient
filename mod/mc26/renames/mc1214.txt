@@ -1,0 +1,13 @@
+# 1.21.4 und aelter: noch keine Zeichen-Pipelines, Texturen bekommen nur das Bild
+import com.mojang.blaze3d.pipeline.RenderPipeline; =>
+import net.minecraft.client.renderer.RenderPipelines; =>
+import net.minecraft.core.ClientAsset; =>
+import com.mojang.blaze3d.textures.FilterMode; =>
+new DynamicTexture(id::toString, => new DynamicTexture(
+new net.minecraft.client.renderer.texture.DynamicTexture(id::toString, => new net.minecraft.client.renderer.texture.DynamicTexture(
+super(() -> name, image); => super(image);
+state.entityType = EntityType.PLAYER; =>
+
+# Namen der Wirkungen
+MobEffects.SPEED => MobEffects.MOVEMENT_SPEED
+MobEffects.JUMP_BOOST => MobEffects.JUMP

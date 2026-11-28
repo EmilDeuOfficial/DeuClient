@@ -1,0 +1,22 @@
+# 1.21 und 1.21.1: Bilder ohne Zeichenart, Pixel als ABGR, keine Zustaende fuer Spielfiguren
+g.blit(net.minecraft.client.renderer.RenderType::guiTextured, => eu.deusmp.deucore.compat.Blit.blit(g,
+g.blitSprite(net.minecraft.client.renderer.RenderType::guiTextured, => eu.deusmp.deucore.compat.Blit.sprite(g,
+Ljava/util/function/Function;Lnet/minecraft/resources/ResourceLocation; => Lnet/minecraft/resources/ResourceLocation;
+regex:java\.util\.function\.Function<net\.minecraft\.resources\.ResourceLocation, net\.minecraft\.client\.renderer\.RenderType> pipeline, ?  =>
+regex:g\.blitSprite\(pipeline, ?  => g.blitSprite(
+regex:g\.blit\(pipeline, ?  => g.blit(
+regex:([A-Za-z]\w*)\.getPixel\( => eu.deusmp.deucore.compat.Pixels.get($1,
+regex:([A-Za-z]\w*)\.setPixel\( => eu.deusmp.deucore.compat.Pixels.set($1,
+
+# Ruestung kennt noch keine eigene Ausruestungs-Angabe
+import net.minecraft.world.item.equipment.Equippable; =>
+Equippable eq = (Equippable)st.get(DataComponents.EQUIPPABLE); => net.minecraft.world.item.Equipable eq = net.minecraft.world.item.Equipable.get(st);
+eq.slot() => eq.getEquipmentSlot()
+
+# Kleinigkeiten
+AbstractWidget.playButtonClickSound(this.minecraft.getSoundManager()) => this.minecraft.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F))
+protected abstract void renderBlurredBackground(); => protected abstract void renderBlurredBackground(float partial);
+renderBlurredBackground(); => renderBlurredBackground(0f);
+int depth, ResourceLocation style, CallbackInfo ci => int depth, CallbackInfo ci
+shouldShowName(Lnet/minecraft/world/entity/LivingEntity;D)Z => shouldShowName(Lnet/minecraft/world/entity/LivingEntity;)Z
+(LivingEntity entity, double distanceSq, CallbackInfoReturnable => (LivingEntity entity, CallbackInfoReturnable

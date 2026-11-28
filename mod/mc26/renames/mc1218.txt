@@ -1,0 +1,58 @@
+# 1.21.8 und aelter
+
+# Eingaben: Bildschirme bekommen noch Zahlen statt Ereignisse
+screen.mouseClicked(new net.minecraft.client.input.MouseButtonEvent((screen.width - 252) / 2 + 32 + 14, (screen.height - 140) / 2 - 14, => screen.mouseClicked((screen.width - 252) / 2 + 32 + 14, (screen.height - 140) / 2 - 14,
+new net.minecraft.client.input.MouseButtonInfo(com.mojang.blaze3d.platform.InputConstants.MOUSE_BUTTON_LEFT, 0)), false); => 0);
+net.minecraft.client.input. => eu.deusmp.deucore.compat.input.
+extends Screen { => extends eu.deusmp.deucore.compat.DeuScreen {
+
+# Spieler-Darstellung heisst noch Player statt Avatar
+Lnet/minecraft/world/entity/Avatar; => Lnet/minecraft/client/player/AbstractClientPlayer;
+import net.minecraft.world.entity.Avatar; => import net.minecraft.client.player.AbstractClientPlayer;
+regex:\bAvatar\b(?=[ >)]) => AbstractClientPlayer
+net.minecraft.client.renderer.entity.player.AvatarRenderer; => net.minecraft.client.renderer.entity.player.PlayerRenderer;
+regex:\bAvatarRenderer\b => PlayerRenderer
+regex:\bAvatarRenderState\b => PlayerRenderState
+
+# Skins und Capes sind noch einfache Bilder
+net.minecraft.world.entity.player.PlayerModelType. => net.minecraft.client.resources.PlayerSkin.Model.
+net.minecraft.world.entity.player.PlayerSkin => net.minecraft.client.resources.PlayerSkin
+net.minecraft.core.ClientAsset.Texture body = new net.minecraft.core.ClientAsset.ResourceTexture(id, id); => net.minecraft.resources.ResourceLocation body = id;
+new net.minecraft.client.resources.PlayerSkin(body, null, null, => new net.minecraft.client.resources.PlayerSkin(body, null, null, null,
+new ClientAsset.ResourceTexture(tex, tex) => tex
+ClientAsset.Texture => net.minecraft.resources.ResourceLocation
+new PlayerSkin(skin.body(), cape, cape, skin.model(), skin.secure()) => new PlayerSkin(skin.texture(), skin.textureUrl(), cape, cape, skin.model(), skin.secure())
+skin.cape() != null => skin.capeTexture() != null
+avatar.skin.elytra() => avatar.skin.elytraTexture()
+elytra.texturePath().getNamespace() => elytra.getNamespace()
+mc.getSkinManager().createLookup(mc.getGameProfile(), false) => mc.getSkinManager().lookupInsecure(mc.getGameProfile())
+
+# Ruestungs- und Elytra-Schicht zeichnet direkt
+import net.minecraft.client.renderer.SubmitNodeCollector; => import net.minecraft.client.renderer.MultiBufferSource;
+Lnet/minecraft/client/renderer/SubmitNodeCollector; => Lnet/minecraft/client/renderer/MultiBufferSource;
+regex:\bSubmitNodeCollector\b => MultiBufferSource
+method = "submit(Lcom => method = "render(Lcom
+
+# Schriften sind noch Ressourcen-Namen
+net.minecraft.network.chat.FontDescription.DEFAULT => net.minecraft.network.chat.Style.DEFAULT_FONT
+import net.minecraft.network.chat.FontDescription; =>
+new FontDescription.Resource( => (
+FontDescription.DEFAULT => net.minecraft.network.chat.Style.DEFAULT_FONT
+regex:\bFontDescription\b => net.minecraft.resources.ResourceLocation
+
+# Kleinigkeiten
+submitOutline( => renderOutline(
+.addFormatter( => .setFormatter(
+InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), key) => InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), key)
+window.handle() => window.getWindow()
+mc.debugEntries.toggleF3Visible() => mc.getDebugOverlay().toggleOverlay()
+info.getProfile().id() => info.getProfile().getId()
+this.minecraft.gui.renderDeferredSubtitles(); =>
+g.requestCursor(com.mojang.blaze3d.platform.cursor.CursorTypes.POINTING_HAND) => {}
+(PlayerRenderer<?>) => (PlayerRenderer)
+state.lightCoords = 0xF000F0; =>
+
+# Mixin-Ziele
+"renderContent" => "render"
+Ljava/util/Optional;Ljava/util/List;)V => Lnet/minecraft/server/packs/resources/ResourceMetadata;)V
+java.util.Optional<?> animation, java.util.List<?> metadata, CallbackInfo ci) => net.minecraft.server.packs.resources.ResourceMetadata metadata, CallbackInfo ci)

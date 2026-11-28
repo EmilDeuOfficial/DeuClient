@@ -1,0 +1,42 @@
+# 1.21.10 und aelter: Ressourcen heissen ResourceLocation, Klassen liegen an anderen Stellen
+Identifier => ResourceLocation
+.identifier() => .location()
+net.minecraft.util.Util => net.minecraft.Util
+net.minecraft.client.model.player.PlayerModel => net.minecraft.client.model.PlayerModel
+net/minecraft/client/model/player/PlayerModel => net/minecraft/client/model/PlayerModel
+net.minecraft.client.model.object.equipment.ElytraModel => net.minecraft.client.model.ElytraModel
+net/minecraft/client/model/object/equipment/ElytraModel => net/minecraft/client/model/ElytraModel
+import net.minecraft.client.renderer.rendertype.RenderTypes; =>
+net.minecraft.client.renderer.rendertype.RenderType => net.minecraft.client.renderer.RenderType
+net/minecraft/client/renderer/rendertype/RenderType => net/minecraft/client/renderer/RenderType
+RenderTypes. => RenderType.
+
+# Knoepfe zeichnen sich noch selbst in renderWidget
+extends AbstractWidget.WithInactiveMessage => extends AbstractWidget
+protected void renderContents( => protected void renderWidget(
+this.renderDefaultSprite(g); => super.renderWidget(g, mouseX, mouseY, delta);
+this.renderDefaultLabel(g.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.NONE)); =>
+
+# Texturen haben noch keine eigenen Sampler
+this.sampler = RenderSystem.getSamplerCache().getClampToEdge(FilterMode.LINEAR); => this.setFilter(true, false);
+import com.mojang.blaze3d.textures.GpuSampler; =>
+Lcom/mojang/blaze3d/textures/GpuSampler; =>
+
+# Kleinigkeiten
+renderOutline( => submitOutline(
+mc.debugEntries.toggleDebugOverlay() => mc.debugEntries.toggleF3Visible()
+withoutShadow() => withShadowColor(0)
+import net.minecraft.server.network.EventLoopGroupHolder; =>
+() -> { }, () -> { }, => () -> { }, () -> { });
+EventLoopGroupHolder.remote(this.minecraft.options.useNativeTransport())); =>
+
+# Mixin-Ziele
+"renderContents" => "renderWidget"
+"init(II)V" => "init(Lnet/minecraft/client/Minecraft;II)V"
+deucore$pauseButton(int w, int h, CallbackInfo ci) => deucore$pauseButton(net.minecraft.client.Minecraft client, int w, int h, CallbackInfo ci)
+Ljava/util/Optional;Ljava/util/List;Ljava/util/Optional;)V => Ljava/util/Optional;Ljava/util/List;)V
+java.util.List<?> metadata, java.util.Optional<?> texture, CallbackInfo ci) => java.util.List<?> metadata, CallbackInfo ci)
+
+# Fortschritte-Reiter: bis 1.21.10 kommt nur die Fensterposition an, den Platz des Reiters dazurechnen
+@Shadow @Final private int max; => @Shadow @Final private int max; @Shadow public abstract int getX(int index); @Shadow public abstract int getY(int index);
+String type = ((Enum<?>) (Object) this).name(); => x += getX(index); y += getY(index); String type = ((Enum<?>) (Object) this).name();

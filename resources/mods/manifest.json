@@ -1,7 +1,17 @@
 {
   "deucore": {
-    "1.21.4": "1.0.0",
+    "1.21": "1.4.0",
+    "1.21.1": "1.4.0",
+    "1.21.9": "1.4.0",
+    "1.21.10": "1.4.0",
     "1.21.11": "1.4.0",
+    "1.21.2": "1.4.0",
+    "1.21.3": "1.4.0",
+    "1.21.4": "1.4.0",
+    "1.21.5": "1.4.0",
+    "1.21.6": "1.4.0",
+    "1.21.7": "1.4.0",
+    "1.21.8": "1.4.0",
     "26.1": "1.4.0",
     "26.1.1": "1.4.0",
     "26.1.2": "1.4.0",
@@ -9,13 +19,43 @@
     "26.3": "1.4.0"
   },
   "versions": {
-    "1.21.4": [
+    "1.21": [
       {
         "file": "DeuCore.jar",
-        "dir": "1.21.4",
+        "dir": "1.21.1",
         "id": "deucore",
         "name": "DeuCore",
-        "version": "1.0.0",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.1": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.1",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.9": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.10",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.10": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.10",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
         "core": true
       }
     ],
@@ -23,6 +63,76 @@
       {
         "file": "DeuCore.jar",
         "dir": "1.21.11",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.2": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.3",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.3": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.3",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.4": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.4",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.5": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.5",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.6": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.8",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.7": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.8",
+        "id": "deucore",
+        "name": "DeuCore",
+        "version": "1.4.0",
+        "core": true
+      }
+    ],
+    "1.21.8": [
+      {
+        "file": "DeuCore.jar",
+        "dir": "1.21.8",
         "id": "deucore",
         "name": "DeuCore",
         "version": "1.4.0",

@@ -1,7 +1,9 @@
-// DeuCore fuer Minecraft 26.x - rein optische Fabric-Mod + Deu-Menü (Rechts-Shift) für DeuClient
-// Ein Quellcode fuer alle 26er Versionen: gradlew build -Ptarget=26.2 (ohne Angabe: 26.3)
-//   targets/<ziel>.properties   Minecraft- und Fabric-API-Version, Plattform, Umbenennungen
-//   platform/<name>/java        Klassen, die sich je Plattform unterscheiden (26.3 nutzt SDL statt GLFW)
+// DeuCore fuer Minecraft 1.21 bis 26.3 - rein optische Fabric-Mod + Deu-Menü (Rechts-Shift) für DeuClient
+// Ein Quellcode fuer alle Versionen: gradlew build -Ptarget=26.2 (ohne Angabe: 26.3)
+//   targets/<ziel>.properties   Minecraft- und Fabric-API-Version, Plattform, Umbenennungen, Mixins
+//   platform/<name>/java        Klassen, die sich je Plattform unterscheiden (26.3 nutzt SDL statt GLFW);
+//                               ein spaeter genannter Ordner ersetzt gleichnamige Dateien
+//   renames/<name>.txt          Namen fuer aeltere Versionen, jede Datei baut auf den vorigen auf
 plugins {
     id 'net.fabricmc.fabric-loom' version "${loom_version}" apply false
     id 'net.fabricmc.fabric-loom-remap' version "${loom_version}" apply false
@@ -28,6 +30,7 @@ def renames = list('renames', ',').collectMany { name ->
     }
 }
 def skipMixins = list('skip_mixins', ',')
+def extraMixins = list('extra_mixins', ',')
 def platforms = list('platform', ',')
 
 version = project.mod_version
@@ -64,7 +67,12 @@ def renamedSources = tasks.register('renamedSources', Sync) {
     into layout.buildDirectory.dir('renamed-src')
     filteringCharset = 'UTF-8'
     inputs.property 'renames', renames.toString()
-    filter { String line -> renames.inject(line) { text, pair -> text.replace(pair[0], pair[1]) } }
+    // links woertlicher Text oder "regex:<Ausdruck>"
+    filter { String line ->
+        renames.inject(line) { text, pair ->
+            pair[0].startsWith('regex:') ? text.replaceAll(pair[0].substring(6), pair[1]) : text.replace(pair[0], pair[1])
+        }
+    }
 }
 
 sourceSets {
@@ -84,7 +92,12 @@ processResources {
     }
     filesMatching('deucore.mixins.json') {
         // Zeilen von Mixins entfernen, die es in dieser Version nicht gibt
-        filter { String line -> skipMixins.any { line.trim().startsWith("\"${it}\"") } ? null : line.replace('JAVA_25', "JAVA_${javaRelease}") }
+        filter { String line ->
+            if (skipMixins.any { line.trim().startsWith("\"${it}\"") }) return null
+            // zusaetzliche Mixins, die nur diese Version braucht, vorn in die Liste
+            def extra = line.trim() == '"client": [' ? extraMixins.collect { "\n    \"${it}\"," }.join('') : ''
+            line.replace('JAVA_25', "JAVA_${javaRelease}") + extra
+        }
     }
 }
 

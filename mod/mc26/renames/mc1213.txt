@@ -1,0 +1,4 @@
+# 1.21.3 und aelter
+chestEquipment => chestItem
+.withShadowColor(0) =>
+"drawMultilineText" => "drawHover"

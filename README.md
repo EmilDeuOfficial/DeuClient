@@ -1,7 +1,7 @@
 # DeuClient
 
 ![Version](https://img.shields.io/badge/version-v1.0-2EFF7A)
-![Minecraft](https://img.shields.io/badge/Minecraft-1.21.11%20%7C%2026.1%20to%2026.3-1C1C1C)
+![Minecraft](https://img.shields.io/badge/Minecraft-1.21%20to%2026.3-1C1C1C)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-1C1C1C)
 ![License](https://img.shields.io/badge/license-proprietary-22C55E)
 
@@ -25,7 +25,7 @@ DeuClient is a Minecraft launcher for Windows with its own Fabric client mod, **
 - Finds Java or downloads Eclipse Temurin, parallel downloads with checksum verification
 - NSIS installer in a dark design, automatic updates from GitHub releases
 
-### DeuCore (Minecraft 1.21.11 and 26.1 to 26.3)
+### DeuCore (Minecraft 1.21 to 26.3)
 
 - Own main menu, loading screen, pause menu, buttons, tooltips and advancement window
 - Mod menu on **Right Shift** with favorites, search and categories
@@ -39,9 +39,8 @@ DeuClient is a Minecraft launcher for Windows with its own Fabric client mod, **
 | Minecraft | DeuCore |
 | --- | --- |
 | 26.1, 26.1.1, 26.1.2, 26.2, 26.3 | Full |
-| 1.21.11 | Full |
-| 1.21.4 | Small version: design and main menu |
-| Other versions | Not available yet; the launcher still starts them with Fabric |
+| 1.21 to 1.21.11 | Full |
+| Other versions | Not available; the launcher still starts them with Fabric |
 
 ## Install
 
@@ -55,7 +54,7 @@ You need Windows 10 or 11 (x64). Java is handled by the launcher.
 | Tool | Needed for |
 | --- | --- |
 | Node.js 20 or newer | Launcher (tested with Node 24) |
-| JDK 25 or newer | DeuCore mods |
+| JDK 25 or newer | DeuCore |
 | Git | Getting the source |
 
 Everything in one step (all mod versions, then the launcher and installer):
@@ -100,7 +99,7 @@ More in the wiki: [Building](https://github.com/EmilDeuOfficial/DeuClient/wiki/B
 electron/    Launcher main process (login, game start, modpacks, Modrinth, servers, worlds)
 src/         Launcher interface (React, Tailwind)
 shared/      Types shared by both
-mod/         DeuCore: mc26 (one source for 1.21.11 and 26.x) and mc1.21.4 (small version)
+mod/         DeuCore: one source (mc26) for Minecraft 1.21 to 26.3
 resources/   Files shipped with the launcher (DeuCore jars, default settings)
 tools/       Build and asset scripts (icons, fonts, capes, wings)
 img/         Logo and icon sources

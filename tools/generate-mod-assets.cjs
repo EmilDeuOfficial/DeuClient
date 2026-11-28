@@ -39,7 +39,7 @@ for (const v of fs.readdirSync(path.join(root, 'mod')).filter((d) => d.startsWit
   write('icon.png', renderSvg(emblemSvg, 128));
   write('icon/icon_32.png', renderSvg(emblemSvg, 32));
   write('icon/icon_64.png', renderSvg(emblemSvg, 64));
-  if (v !== 'mc1.21.4') write('textures/font/logo.png', renderSvg(emblemSvg, 16));
+  write('textures/font/logo.png', renderSvg(emblemSvg, 16));
   console.log(`  ok ${v}: emblem, wordmark ${1024}x${wordmark.height}, icons`);
 }
 console.log(`WORDMARK_H for the mods: ${wordmark.height}`);

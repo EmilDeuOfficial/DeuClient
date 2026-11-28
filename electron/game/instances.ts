@@ -79,7 +79,7 @@ function applyProfileTemplate(inst: Instance): void {
     if (inst.loader === 'fabric') {
       // vor 26.3 zaehlt Minecraft die Tasten anders (GLFW): gemeinsame Vorlage fuer diese Versionen
       const own = path.join(root, inst.mcVersion);
-      const older = /^(26\.[12](\.\d+)?|1\.21\.11)$/.test(inst.mcVersion);
+      const older = /^(26\.[12](\.\d+)?|1\.21(\.\d+)?)$/.test(inst.mcVersion);
       copyTree(!fs.existsSync(own) && older ? path.join(root, '26-glfw') : own, dir);
     }
   } catch {

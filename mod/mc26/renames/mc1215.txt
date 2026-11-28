@@ -1,0 +1,29 @@
+# 1.21.5 und aelter: Oberflaeche zeichnet noch direkt (3D-Stapel, RenderType statt Pipeline)
+
+g.pose() => eu.deusmp.deucore.compat.Pose.of(g)
+g.nextStratum(); => g.flush(); g.pose().translate(0f, 0f, 400f);
+g.submitEntityRenderState( => eu.deusmp.deucore.compat.GuiEntity.submit(g,
+
+# Zeichenarten
+RenderPipelines.GUI_TEXTURED => net.minecraft.client.renderer.RenderType::guiTextured
+Lcom/mojang/blaze3d/pipeline/RenderPipeline; => Ljava/util/function/Function;
+com.mojang.blaze3d.pipeline.RenderPipeline pipeline, => java.util.function.Function<net.minecraft.resources.ResourceLocation, net.minecraft.client.renderer.RenderType> pipeline,
+regex:(?<![.\w])RenderPipeline pipeline, => java.util.function.Function<net.minecraft.resources.ResourceLocation, net.minecraft.client.renderer.RenderType> pipeline,
+
+# HUD-Ebenen der Fabric API
+net.fabricmc.fabric.api.client.rendering.v1.hud. => eu.deusmp.deucore.compat.hud.
+
+# Kleinigkeiten
+mc.getMainRenderTarget(), 1, msg -> {}); => mc.getMainRenderTarget(), msg -> {});
+box.setTextShadow(!box.getValue().isEmpty()); =>
+g.setComponentTooltipForNextFrame( => g.renderComponentTooltip(
+getCurrentVersion().name() => getCurrentVersion().getName()
+
+# drawString liefert bis 1.21.5 eine Zahl zurueck
+Lnet/minecraft/util/FormattedCharSequence;III)V => Lnet/minecraft/util/FormattedCharSequence;III)I
+drawString(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;III)V => drawString(Lnet/minecraft/client/gui/Font;Lnet/minecraft/network/chat/Component;III)I
+renderBlurredBackground(GuiGraphics g); => renderBlurredBackground();
+renderBlurredBackground(g); => renderBlurredBackground();
+
+# Wirkungs-Symbole liegen in einem eigenen Atlas
+g.blitSprite(net.minecraft.client.renderer.RenderType::guiTextured, sp, 7, y, 18, 18); => g.blitSprite(net.minecraft.client.renderer.RenderType::guiTextured, net.minecraft.client.Minecraft.getInstance().getMobEffectTextures().get(e.holder()), 7, y, 18, 18);
